@@ -1,7 +1,7 @@
 {
   "name": "driver-ui",
   "private": true,
-  "version": "3.0.1",
+  "version": "3.0.2",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -14,6 +14,7 @@
     "@tauri-apps/api": "^2.12.4",
     "@tauri-apps/plugin-autostart": "^2.7.0",
     "@tauri-apps/plugin-notification": "^2.8.0",
+    "@tauri-apps/plugin-opener": "^2.7.2",
     "framer-motion": "^14.10.1",
     "lucide-react": "^1.70.0",
     "react": "^19.3.1",
