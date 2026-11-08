@@ -11,7 +11,7 @@
  * defs SVG của theme-switch Uiverse render 1 lần + dải sáng sweep mỗi
  * lần đổi theme (không đổi tức thì).
  */
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { AnimatePresence } from 'framer-motion';
 import { Battery, Cpu, Gauge, Radio } from 'lucide-react';
 import { MouseProvider, useMouse } from './store';
@@ -151,6 +151,34 @@ function Root(): React.JSX.Element {
   const { connected, loading, theme } = useMouse();
   const [sweepKey, setSweepKey] = useState(0);
   const firstTheme = useRef(true);
+  // v3.0.3 — adaptive window: Rust sizes the frame to the monitor
+  // (1280x1024 x scale, never fullscreen). Zoom the whole document so
+  // the 1280x1024 design always fills the frame exactly — every layer
+  // stays intact, nothing reflows or clips. Clamped [0.4, 1]: never zoom
+  // in, never shrink past readable. The tray popup is a separate window
+  // and never gets this zoom (it renders TrayPopupPage, not Root).
+  // NOTE: after zoom is applied, window.innerWidth is in zoomed CSS px
+  // (physical / zoom), so the physical width must be recovered as
+  // innerWidth * currentZoom — computing zoom from innerWidth alone
+  // would flip-flop between two values on every resize event.
+  useLayoutEffect(() => {
+    const applyZoom = (): void => {
+      const current = parseFloat(document.documentElement.style.zoom || '1') || 1;
+      const physicalW = window.innerWidth * current;
+      const physicalH = window.innerHeight * current;
+      const z = Math.min(
+        1,
+        Math.max(0.4, Math.min(physicalW / 1280, physicalH / 1024)),
+      );
+      document.documentElement.style.zoom = String(z);
+    };
+    applyZoom();
+    window.addEventListener('resize', applyZoom);
+    return () => {
+      window.removeEventListener('resize', applyZoom);
+      document.documentElement.style.zoom = '';
+    };
+  }, []);
   useEffect(() => {
     if (firstTheme.current) {
       firstTheme.current = false;
