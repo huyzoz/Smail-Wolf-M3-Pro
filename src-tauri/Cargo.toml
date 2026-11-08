@@ -1,6 +1,6 @@
 [package]
 name = "smailwolf-m3-pro-driver"
-version = "3.0.2"
+version = "3.0.3"
 description = "SMAILWOLF M3 Pro driver — Tauri 2 desktop shell (Windows-only). HID stays in the frontend (WebHID); the Rust backend owns window, tray, autostart, persistence and notifications only."
 authors = ["Smail-Wolf-M3-Pro contributors"]
 license = "MIT"
