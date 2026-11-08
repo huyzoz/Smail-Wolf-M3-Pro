@@ -16,13 +16,13 @@
  */
 import { useEffect, useState } from 'react';
 import {
-  batteryPercent,
+  batteryPercentPrecise,
   getBatteryState,
   trayQuit,
   trayShowMain,
   type BatteryState,
 } from '../lib/tauri';
-import { loadWithElapsed } from '../lib/battery';
+import { loadWithElapsed, drainMaAt, runtimeHours } from '../lib/battery';
 
 const LOW_PCT = 20;
 
@@ -47,21 +47,28 @@ export default function TrayPopupPage() {
     };
   }, []);
 
-  const pct = batteryPercent(state);
-  const low = pct <= LOW_PCT;
+  const pct = batteryPercentPrecise(state);
+  const pctInt = Math.round(pct);
+  const low = pctInt <= LOW_PCT;
   const charging = state?.charging ?? false;
   const saver = state?.saver ?? false;
+  const hz = state?.last_polling_rate ?? 125;
+  const rateLine = state
+    ? charging
+      ? `Đang sạc +150 mA · ${state.remaining_mah.toFixed(1)} mAh`
+      : `−${drainMaAt(hz)} mA · ${state.remaining_mah.toFixed(1)} mAh còn lại · ≈${Math.round(runtimeHours(hz) * (pct / 100))} giờ`
+    : 'Chưa có dữ liệu pin — hiển thị 100% mặc định';
 
   return (
     <div
-      className="flex h-screen w-screen flex-col justify-between p-4"
+      className="flex h-screen w-screen flex-col justify-between p-3"
       style={{ background: 'var(--navy)', color: 'var(--paper-on-navy)' }}
       role="dialog"
       aria-label="SMAILWOLF M3 Pro — pin chuột"
     >
       {/* Header */}
       <div className="flex items-center justify-between">
-        <span className="font-display text-lg font-semibold tracking-wide">
+        <span className="font-display text-base font-semibold tracking-wide">
           SMAILWOLF M3 PRO
         </span>
         <span
@@ -75,16 +82,16 @@ export default function TrayPopupPage() {
         </span>
       </div>
 
-      {/* iOS-style battery bar — % INSIDE the bar */}
-      <div className="flex flex-col gap-2">
+      {/* iOS-style battery bar — % INSIDE the bar (1 số lẻ để thấy pin tụt) */}
+      <div className="flex flex-col gap-1.5">
         <div
-          className="relative h-12 w-full overflow-hidden rounded-xl border-2"
+          className="relative h-10 w-full overflow-hidden rounded-xl border-2"
           style={{ borderColor: 'var(--line-navy)', background: 'var(--navy-2)' }}
           role="progressbar"
-          aria-valuenow={pct}
+          aria-valuenow={pctInt}
           aria-valuemin={0}
           aria-valuemax={100}
-          aria-label={`Pin chuột ${pct} phần trăm (ước tính)`}
+          aria-label={`Pin chuột ${pct.toFixed(1)} phần trăm (ước tính)`}
         >
           <div
             className="h-full transition-[width] duration-300 ease-out motion-reduce:transition-none"
@@ -93,14 +100,12 @@ export default function TrayPopupPage() {
               background: low ? 'var(--danger)' : saver ? '#eab308' : 'var(--accent)',
             }}
           />
-          <span className="font-display absolute inset-0 flex items-center justify-center text-xl font-semibold tracking-wider text-white">
-            {pct}%
+          <span className="font-display absolute inset-0 flex items-center justify-center text-lg font-semibold tracking-wider text-white">
+            {pct.toFixed(1)}%
           </span>
         </div>
-        <p className="text-center text-sm" style={{ color: 'var(--muted-on-navy)' }}>
-          {state
-            ? `${Math.round(state.remaining_mah)} mAh còn lại · polling ${state.last_polling_rate} Hz · ước tính`
-            : 'Chưa có dữ liệu pin — hiển thị 100% mặc định'}
+        <p className="text-center text-xs" style={{ color: 'var(--muted-on-navy)' }}>
+          {rateLine} · ước tính
         </p>
       </div>
 

@@ -65,7 +65,9 @@ function PickerFx(): React.JSX.Element {
     let h = 0;
     const CELL = 56;
     const resize = (): void => {
-      const dpr = Math.min(window.devicePixelRatio || 1, 2);
+      // v3.0.2 — DPR cap 1.5 (was 2): halves canvas pixels on HiDPI,
+      // the picker glow stays smooth on weak iGPUs.
+      const dpr = Math.min(window.devicePixelRatio || 1, 1.5);
       w = canvas.clientWidth;
       h = canvas.clientHeight;
       canvas.width = Math.max(1, w * dpr);
@@ -78,14 +80,21 @@ function PickerFx(): React.JSX.Element {
     let my = -999;
     let gx = -999;
     let gy = -999;
+    let lastMove = 0;
     const onMove = (e: MouseEvent): void => {
       const r = canvas.getBoundingClientRect();
       mx = e.clientX - r.left;
       my = e.clientY - r.top;
+      lastMove = performance.now();
+      // v3.0.2 — LAG FIX: vòng rAF dừng khi chuột đứng yên (xem cuối tick);
+      // di chuột lại thì khởi động vòng lặp.
+      if (!raf) raf = requestAnimationFrame(tick);
     };
     const onLeave = (): void => {
       mx = -999;
       my = -999;
+      lastMove = 0;
+      ctx.clearRect(0, 0, w, h);
     };
     window.addEventListener('mousemove', onMove);
     document.documentElement.addEventListener('mouseleave', onLeave);
@@ -125,9 +134,8 @@ function PickerFx(): React.JSX.Element {
             const y = r * CELL + 3 - lift;
             const s = CELL - 6;
             ctx.save();
-            ctx.shadowColor = `rgba(234,88,12,${(a * 0.6).toFixed(3)})`;
-            ctx.shadowBlur = 14;
-            ctx.shadowOffsetY = 3;
+            // v3.0.2 — bỏ shadowBlur (đắt nhất trên iGPU yếu); chỉ fill +
+            // stroke đã đủ hiệu ứng ô vuông nổi lên.
             ctx.fillStyle = `rgba(234,88,12,${(a * 0.22).toFixed(3)})`;
             ctx.strokeStyle = `rgba(234,88,12,${a.toFixed(3)})`;
             ctx.lineWidth = 1.5;
@@ -140,7 +148,15 @@ function PickerFx(): React.JSX.Element {
           }
         }
       }
-      raf = requestAnimationFrame(tick);
+      // v3.0.2 — LAG FIX: dừng vòng rAF khi chuột đứng yên >1.5s. Khung hình
+      // cuối vẫn giữ nguyên trên canvas (hào quang + ô vuông đứng yên) nên
+      // nhìn không đổi, nhưng CPU/iGPU được nghỉ; di chuột lại thì onMove
+      // khởi động vòng lặp.
+      if (performance.now() - lastMove < 1500) {
+        raf = requestAnimationFrame(tick);
+      } else {
+        raf = 0;
+      }
     };
     raf = requestAnimationFrame(tick);
     return () => {

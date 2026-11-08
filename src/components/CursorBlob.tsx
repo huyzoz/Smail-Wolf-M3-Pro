@@ -26,17 +26,6 @@ export function CursorBlob(): React.JSX.Element {
     let targetOpacity = 0;
     let raf = 0;
     let lastMove = 0;
-    const onMove = (e: PointerEvent): void => {
-      tx = e.clientX;
-      ty = e.clientY;
-      targetOpacity = 1;
-      lastMove = performance.now();
-    };
-    const onLeave = (): void => {
-      targetOpacity = 0;
-    };
-    window.addEventListener('pointermove', onMove, { passive: true });
-    document.documentElement.addEventListener('mouseleave', onLeave);
     const tick = (): void => {
       if (tx < -100) {
         // Chưa di chuột lần nào: blob nấp ngoài màn hình.
@@ -54,8 +43,28 @@ export function CursorBlob(): React.JSX.Element {
         el.style.transform = `translate3d(${x - 28}px, ${y - 28}px, 0)`;
         el.style.opacity = opacity.toFixed(3);
       }
-      raf = requestAnimationFrame(tick);
+      // v3.0.2 — LAG FIX: đừng chạy rAF mãi khi chuột đứng yên. Dừng vòng
+      // lặp khi blob đã mờ hẳn + không còn di chuyển; onMove khởi động lại.
+      const active =
+        targetOpacity > 0 || opacity > 0.01 || performance.now() - lastMove < 2600;
+      if (active) {
+        raf = requestAnimationFrame(tick);
+      } else {
+        raf = 0;
+      }
     };
+    const onMove = (e: PointerEvent): void => {
+      tx = e.clientX;
+      ty = e.clientY;
+      targetOpacity = 1;
+      lastMove = performance.now();
+      if (!raf) raf = requestAnimationFrame(tick);
+    };
+    const onLeave = (): void => {
+      targetOpacity = 0;
+    };
+    window.addEventListener('pointermove', onMove, { passive: true });
+    document.documentElement.addEventListener('mouseleave', onLeave);
     raf = requestAnimationFrame(tick);
     return () => {
       cancelAnimationFrame(raf);
