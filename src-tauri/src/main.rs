@@ -80,10 +80,26 @@ fn fit_main_window(app: &tauri::AppHandle, center_window: bool) -> f64 {
         .map(|s| (s.width - w).abs() > 2.0 || (s.height - h).abs() > 2.0)
         .unwrap_or(true);
     if needs_resize {
+        // Tauri 2.12 has NO set_inner_size: set_size sizes the OUTER
+        // window (decorations included), while set_min/max_size are
+        // INNER sizes (verified in tauri 2.12.5 source). Measure the
+        // decoration delta (outer - inner) and add it to the fitted
+        // content size, so the CONTENT area ends up exactly fitted.
+        // Fallback (delta unreadable): use the fitted size as the outer
+        // size — the frontend zoom still fits the content, just with a
+        // small margin.
+        let delta = (|| {
+            let outer = main.outer_size().ok()?.to_logical::<f64>(sf);
+            let inner = main.inner_size().ok()?.to_logical::<f64>(sf);
+            Some((outer.width - inner.width, outer.height - inner.height))
+        })()
+        .unwrap_or((0.0, 0.0));
+        let outer_w = (w + delta.0).round();
+        let outer_h = (h + delta.1).round();
         let size = Some(Size::Logical(LogicalSize::new(w, h)));
         let _ = main.set_min_size(size);
         let _ = main.set_max_size(size);
-        let _ = main.set_inner_size(Size::Logical(LogicalSize::new(w, h)));
+        let _ = main.set_size(Size::Logical(LogicalSize::new(outer_w, outer_h)));
         if center_window {
             let _ = main.center();
         }
