@@ -7,7 +7,7 @@
 #
 # Produces:
 #   - NSIS installer  (.setup.exe)
-#   - Portable build  (.zip, from the Tauri "zip" bundle target)
+#   - Portable build  (.zip of the compiled exe; Tauri 2 has no "zip" bundle target)
 #   - SHA256SUMS.txt  (SHA-256 over both artifacts)
 # No code signing is configured: the installer is UNSIGNED and Windows
 # SmartScreen will warn on first run (see RELEASE-NOTES-v3.0.0-DRAFT.md).
@@ -61,7 +61,7 @@ jobs:
       - name: cargo check (Rust backend gate)
         run: cargo check --manifest-path src-tauri/Cargo.toml
 
-      - name: Tauri build (NSIS installer + portable zip)
+      - name: Tauri build (NSIS installer)
         run: npx tauri build
 
       - name: Collect artifacts + SHA-256 checksums
@@ -71,16 +71,20 @@ jobs:
           $version = (Get-Content src-tauri/tauri.conf.json -Raw | ConvertFrom-Json).version
           if (-not $version) { throw 'Could not read version from src-tauri/tauri.conf.json' }
 
+          New-Item -ItemType Directory -Force release-artifacts | Out-Null
+
           $setup = Get-ChildItem src-tauri/target/release/bundle/nsis/*-setup.exe -ErrorAction SilentlyContinue | Select-Object -First 1
           if (-not $setup) { throw 'NSIS installer not found under src-tauri/target/release/bundle/nsis/' }
-          $portable = Get-ChildItem src-tauri/target/release/bundle/zip/*.zip -ErrorAction SilentlyContinue | Select-Object -First 1
-          if (-not $portable) { throw 'Portable zip not found under src-tauri/target/release/bundle/zip/' }
-
-          New-Item -ItemType Directory -Force release-artifacts | Out-Null
           $setupName = "SMAILWOLF-M3-Pro-Driver_${version}_x64-setup.exe"
-          $zipName = "SMAILWOLF-M3-Pro-Driver_${version}_x64.zip"
           Copy-Item $setup.FullName "release-artifacts/$setupName"
-          Copy-Item $portable.FullName "release-artifacts/$zipName"
+
+          # Portable zip: Tauri 2 has no "zip" bundle target, so zip the
+          # compiled exe ourselves (frontend is embedded in the binary;
+          # WebView2 ships with Windows 11, so the exe runs standalone).
+          $exe = Get-ChildItem src-tauri/target/release/*.exe -ErrorAction SilentlyContinue | Select-Object -First 1
+          if (-not $exe) { throw 'App exe not found under src-tauri/target/release/' }
+          $zipName = "SMAILWOLF-M3-Pro-Driver_${version}_x64.zip"
+          Compress-Archive -Path $exe.FullName -DestinationPath "release-artifacts/$zipName" -Force
 
           # SHA256SUMS.txt over every artifact in the folder (itself excluded).
           Get-ChildItem release-artifacts/* -File | ForEach-Object {
