@@ -23,11 +23,17 @@ import DevicePicker from './components/DevicePicker';
 import LoadingScreen from './components/LoadingScreen';
 import { CursorBlob } from './components/CursorBlob';
 import { ThemeSwitchDefs } from './components/ThemeToggle';
-import { Marquee, Toasts } from './components/ui';
+import { Marquee, Toasts, ConfirmModal } from './components/ui';
 import { pollingHz } from './lib/hid';
+import {
+  checkAppUpdate,
+  openUpdateSetup,
+  formatReleaseTime,
+  type AppUpdateInfo,
+} from './lib/updater';
 
 function Docks(): React.JSX.Element {
-  const { config, simPct, simCharging, simSaver, version, mouseName, wired } = useMouse();
+  const { config, simPctPrecise, simCharging, simSaver, version, mouseName, wired } = useMouse();
   const currentDpi = config ? config.dpi[config.dpiIndex] : null;
   const items = [
     {
@@ -44,7 +50,7 @@ function Docks(): React.JSX.Element {
     },
     {
       label: 'Pin (ước tính)',
-      value: config ? `${simPct}%` : '—',
+      value: config ? `${simPctPrecise.toFixed(1)}%` : '—',
       sub: !config ? 'Chưa kết nối' : simCharging ? 'Đang sạc · ước tính' : simSaver ? 'Tiết kiệm pin · ước tính' : 'Mô phỏng · ước tính',
       icon: <Battery className={`h-4 w-4 ${simSaver ? 'text-[#ca8a04]' : 'text-[#c2410c]'}`} />,
     },
@@ -160,6 +166,57 @@ function Root(): React.JSX.Element {
       {!connected ? <DevicePicker /> : <Shell />}
       <AnimatePresence>{loading && <LoadingScreen />}</AnimatePresence>
       <Toasts />
+      <AppUpdateGate />
     </>
+  );
+}
+
+// v3.0.2 — popup báo bản cập nhật mới (lấy từ release mới nhất của repo).
+// Chỉ hiện 1 lần mỗi tag: bấm "Để sau" thì nhớ, không hiện lại tag đó nữa
+// (mở tab Khác vẫn thấy banner trong thẻ Firmware). Đợi loading 3s xong
+// mới hiện để không đè lên màn loading.
+function AppUpdateGate(): React.JSX.Element | null {
+  const { loading } = useMouse();
+  const [info, setInfo] = useState<AppUpdateInfo | null>(null);
+  const [open, setOpen] = useState(false);
+  useEffect(() => {
+    let alive = true;
+    void checkAppUpdate().then((res) => {
+      if (!alive || !res?.available) return;
+      if (localStorage.getItem(`update-dismissed-${res.latestTag}`) === '1') return;
+      setInfo(res);
+    });
+    return () => {
+      alive = false;
+    };
+  }, []);
+  useEffect(() => {
+    if (info && !loading) setOpen(true);
+  }, [info, loading]);
+  if (!info) return null;
+  const dismiss = (): void => {
+    localStorage.setItem(`update-dismissed-${info.latestTag}`, '1');
+    setOpen(false);
+  };
+  return (
+    <ConfirmModal
+      open={open}
+      title={`Đã có bản cập nhật mới v${info.latestVersion}`}
+      confirmLabel="Tải bản cài đặt"
+      onConfirm={() => {
+        dismiss();
+        void openUpdateSetup(info);
+      }}
+      onCancel={dismiss}
+    >
+      <p>
+        Phát hành: {formatReleaseTime(info.publishedAt)} · Bạn đang dùng v{info.currentVersion}.
+      </p>
+      {info.notes.trim() !== '' && (
+        <div className="mt-2 max-h-40 overflow-y-auto whitespace-pre-line rounded-lg bg-black/20 p-3">
+          {info.notes.trim()}
+        </div>
+      )}
+    </ConfirmModal>
   );
 }

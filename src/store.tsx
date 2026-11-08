@@ -32,6 +32,7 @@ import {
   indexForHz,
   loadWithElapsed,
   percentOf,
+  percentOfPrecise,
   rateHz,
   shouldNotifyLow,
   tick as batteryTick,
@@ -89,6 +90,10 @@ interface MouseStore {
   /** v3.1 — pin MÔ PHỎNG (ước tính, xem src/lib/battery.ts). `battery`
       (report 48) là giá trị thô của firmware, KHÔNG hiện ra UI nữa. */
   simPct: number;
+  /** v3.0.2 — % pin 1 số thập phân (hiển thị): xả 3 mA thì % nguyên ngồi
+      yên ở 100% suốt 13 giờ đầu, còn 1 số lẻ tụt 0.1 mỗi ~8 phút — nhìn
+      thấy pin tụt thật. Logic (ngưỡng 20%, saver) vẫn dùng simPct nguyên. */
+  simPctPrecise: number;
   simCharging: boolean;
   simSaver: boolean;
   simRemainingMah: number;
@@ -186,6 +191,7 @@ export function MouseProvider({ children }: { children: ReactNode }): React.JSX.
   const simLoadedRef = useRef(false);
   const lastPersistRef = useRef(0);
   const simPct = percentOf(simBattery);
+  const simPctPrecise = percentOfPrecise(simBattery);
   const simCharging = simBattery?.charging ?? false;
   const simSaver = simBattery?.saver ?? false;
   const simRemainingMah = simBattery?.remaining_mah ?? 400;
@@ -476,7 +482,18 @@ export function MouseProvider({ children }: { children: ReactNode }): React.JSX.
       const nowS = Math.floor(Date.now() / 1000);
       const rateChanged = next.last_polling_rate !== prev.last_polling_rate;
       const chargingChanged = next.charging !== prev.charging;
-      setSimBattery(next);
+      // v3.0.2 — LAG FIX: đừng setState mỗi giây. State chính xác vẫn chạy
+      // trong simRef (persist + thông báo pin yếu dùng ref), chỉ re-render
+      // khi giá trị HIỂN THỊ đổi: % 1 số lẻ, mAh 1 số lẻ, sạc/rate/saver.
+      // Ở 125 Hz (3 mA) % lẻ đổi mỗi ~8 phút, mAh lẻ mỗi ~2 phút — thay vì
+      // cả cây component re-render 1 lần/giây trên máy yếu.
+      const displayChanged =
+        percentOfPrecise(next) !== percentOfPrecise(prev) ||
+        Math.round(next.remaining_mah * 10) !== Math.round(prev.remaining_mah * 10) ||
+        chargingChanged ||
+        rateChanged ||
+        next.saver !== prev.saver;
+      if (displayChanged) setSimBattery(next);
       simRef.current = next;
       if (
         rateChanged ||
@@ -736,7 +753,7 @@ export function MouseProvider({ children }: { children: ReactNode }): React.JSX.
     () => ({
       mode, connected, connecting, loading, theme, toggleTheme, busy, wired, deviceLabel, version, mouseName,
       battery, chargeFlag, batteryHistory, lastBatteryRead, batteryReads,
-      simPct, simCharging, simSaver, simRemainingMah, simPollingHz, setBatterySaver,
+      simPct, simPctPrecise, simCharging, simSaver, simRemainingMah, simPollingHz, setBatterySaver,
       config, keys, configRaw, keysRaw, toasts,
       macros, profiles, dpiListening, tab, setTab, skinId, setSkinId, connect, disconnect, refresh,
       readBatteryNow,
@@ -746,7 +763,7 @@ export function MouseProvider({ children }: { children: ReactNode }): React.JSX.
     [
       mode, connected, connecting, loading, theme, toggleTheme, busy, wired, deviceLabel, version, mouseName,
       battery, chargeFlag, batteryHistory, lastBatteryRead, batteryReads,
-      simPct, simCharging, simSaver, simRemainingMah, simPollingHz, setBatterySaver,
+      simPct, simPctPrecise, simCharging, simSaver, simRemainingMah, simPollingHz, setBatterySaver,
       config, keys, configRaw, keysRaw, toasts,
       macros, profiles, dpiListening, tab, skinId, setSkinId, connect, disconnect, refresh,
       readBatteryNow,
