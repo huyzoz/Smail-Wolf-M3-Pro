@@ -12,6 +12,7 @@ import {
   indexForHz,
   loadWithElapsed,
   percentOf,
+  percentOfPrecise,
   rateHz,
   runtimeHours,
   shouldNotifyLow,
@@ -107,6 +108,16 @@ eq('load with zero elapsed returns same value', loadWithElapsed({ ...full(), rem
 eq('percent 400 mAh = 100%', percentOf(full()), 100);
 eq('percent 200 mAh = 50%', percentOf({ ...full(), remaining_mah: 200 }), 50);
 eq('percent null state = 100 (first run)', percentOf(null), 100);
+
+// v3.0.2 — precise % (1 decimal): the drain is visible. 3 mA at 125 Hz =
+// 0.000833 mAh/s, so 0.1% (0.4 mAh) takes ~8 min; integer % would sit at
+// 100% for the first ~13 h.
+eq('precise 400 mAh = 100', percentOfPrecise(full()), 100);
+eq('precise 399.6 mAh = 99.9', percentOfPrecise({ ...full(), remaining_mah: 399.6 }), 99.9);
+eq('precise 200 mAh = 50', percentOfPrecise({ ...full(), remaining_mah: 200 }), 50);
+eq('precise 0 mAh = 0', percentOfPrecise({ ...full(), remaining_mah: 0 }), 0);
+eq('precise null state = 100', percentOfPrecise(null), 100);
+eq('precise 10 min at 125 Hz = 99.9 (0.5 mAh drained)', percentOfPrecise(tick(full(), 600, 125)), 99.9);
 eq('default state is full, not empty', defaultState(now).remaining_mah, 400);
 
 // --- low-battery trigger: fires once per discharge cycle ---
