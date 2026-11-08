@@ -87,10 +87,14 @@ jobs:
           Compress-Archive -Path $exe.FullName -DestinationPath "release-artifacts/$zipName" -Force
 
           # SHA256SUMS.txt over every artifact in the folder (itself excluded).
-          Get-ChildItem release-artifacts/* -File | ForEach-Object {
+          # NOTE: collect the lines in a variable FIRST — piping straight into
+          # Out-File creates SHA256SUMS.txt before Get-ChildItem runs, so the
+          # file lists (and locks) itself and Get-FileHash fails.
+          $lines = Get-ChildItem release-artifacts/* -File | Where-Object { $_.Name -ne 'SHA256SUMS.txt' } | ForEach-Object {
             $hash = (Get-FileHash $_.FullName -Algorithm SHA256).Hash.ToLower()
             "$hash  $($_.Name)"
-          } | Out-File -Encoding ascii release-artifacts/SHA256SUMS.txt
+          }
+          $lines | Out-File -Encoding ascii release-artifacts/SHA256SUMS.txt
           Get-Content release-artifacts/SHA256SUMS.txt
 
       - name: Upload Windows artifacts
