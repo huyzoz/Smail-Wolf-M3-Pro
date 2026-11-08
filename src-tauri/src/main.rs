@@ -1,3 +1,8 @@
+// No console ("cmd") window in release builds: without this the Rust
+// binary runs as a console-subsystem app, Windows shows a cmd window,
+// and closing it kills the whole app. Debug keeps the console.
+#![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
+
 //! SMAILWOLF M3 Pro Driver — Tauri 2 shell (Windows-only).
 //!
 //! The Rust backend owns ONLY: fixed main window, system tray + tray popup,
@@ -18,8 +23,8 @@ use tauri_plugin_notification::NotificationExt;
 const MAIN_W: f64 = 1280.0;
 const MAIN_H: f64 = 1024.0;
 /// Tray popup size (must match `tray-popup` in tauri.conf.json).
-const POPUP_W: u32 = 340;
-const POPUP_H: u32 = 280;
+const POPUP_W: u32 = 300;
+const POPUP_H: u32 = 240;
 const POPUP_MARGIN: i32 = 8;
 /// Approx. Windows taskbar height, so the popup sits just above it.
 const TASKBAR_RESERVE: i32 = 48;
@@ -122,6 +127,17 @@ fn show_tray_popup(app: &tauri::AppHandle) {
 
 fn main() {
     tauri::Builder::default()
+        // Single instance: a second launch (double-click, installer
+        // auto-run, autostart) focuses the existing window instead of
+        // opening a duplicate main window.
+        .plugin(tauri_plugin_single_instance::init(|app, _argv, _cwd| {
+            if let Some(win) = app.get_webview_window("main") {
+                let _ = win.unminimize();
+                let _ = win.show();
+                let _ = win.set_focus();
+            }
+        }))
+        .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_autostart::init(
             tauri_plugin_autostart::MacosLauncher::LaunchAgent,
             None,
