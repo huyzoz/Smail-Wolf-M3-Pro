@@ -19,9 +19,16 @@ use tauri::{LogicalSize, Manager, PhysicalPosition, Position, Size, WindowEvent}
 use tauri_plugin_autostart::ManagerExt;
 use tauri_plugin_notification::NotificationExt;
 
-/// Fixed main-window size — absolute, no resize, no maximize.
-const MAIN_W: f64 = 1280.0;
-const MAIN_H: f64 = 1024.0;
+/// Design size the UI is built for. The window is this big on large
+/// screens and scales DOWN to fit smaller monitors — never fullscreen,
+/// always a floating rectangle (Ethan's hard rule).
+const DESIGN_W: f64 = 1280.0;
+const DESIGN_H: f64 = 1024.0;
+/// Smallest the window may shrink to (scale 0.5 -> 640x512). Below that
+/// the UI would be unreadable; the window just fits as well as it can.
+const MIN_SCALE: f64 = 0.5;
+/// Horizontal margin so the fitted window isn't flush to the screen edges.
+const EDGE_MARGIN: f64 = 16.0;
 /// Tray popup size (must match `tray-popup` in tauri.conf.json).
 const POPUP_W: u32 = 300;
 const POPUP_H: u32 = 240;
@@ -31,6 +38,58 @@ const TASKBAR_RESERVE: i32 = 48;
 
 /// Low-battery notification body (exact wording Ethan specified).
 const LOW_BATTERY_BODY: &str = "Chuột của bạn còn 20% pin, vui lòng sạc pin";
+
+/// Fit scale for the primary monitor: the largest scale (<= 1) that fits
+/// the design size inside the monitor's work area (taskbar reserved).
+/// Returns 1.0 when the monitor is big enough or can't be read.
+fn fit_scale(app: &tauri::AppHandle) -> f64 {
+    let Ok(Some(monitor)) = app.primary_monitor() else {
+        return 1.0;
+    };
+    let sf = monitor.scale_factor();
+    if sf <= 0.0 {
+        return 1.0;
+    }
+    let size = monitor.size();
+    let avail_w = size.width as f64 / sf - EDGE_MARGIN * 2.0;
+    let avail_h = size.height as f64 / sf - TASKBAR_RESERVE as f64 - EDGE_MARGIN;
+    (avail_w / DESIGN_W)
+        .min(avail_h / DESIGN_H)
+        .min(1.0)
+        .clamp(MIN_SCALE, 1.0)
+}
+
+/// Size the main window to the fitted size and lock it there
+/// (min = max = fitted, no resize/maximize). Only touches the window when
+/// the size actually changed, so focus re-fits never flicker. Returns the
+/// scale used. `center_window` only on the initial fit — re-fits must not
+/// yank a window the user dragged somewhere.
+fn fit_main_window(app: &tauri::AppHandle, center_window: bool) -> f64 {
+    let scale = fit_scale(app);
+    let Some(main) = app.get_webview_window("main") else {
+        return scale;
+    };
+    let w = (DESIGN_W * scale).round();
+    let h = (DESIGN_H * scale).round();
+    let sf = main.scale_factor().unwrap_or(1.0);
+    let cur = main
+        .inner_size()
+        .map(|s| s.to_logical::<f64>(sf))
+        .ok();
+    let needs_resize = cur
+        .map(|s| (s.width - w).abs() > 2.0 || (s.height - h).abs() > 2.0)
+        .unwrap_or(true);
+    if needs_resize {
+        let size = Some(Size::Logical(LogicalSize::new(w, h)));
+        let _ = main.set_min_size(size);
+        let _ = main.set_max_size(size);
+        let _ = main.set_inner_size(Size::Logical(LogicalSize::new(w, h)));
+        if center_window {
+            let _ = main.center();
+        }
+    }
+    scale
+}
 
 // ---------------------------------------------------------------------------
 // Autostart (tauri-plugin-autostart v2)
@@ -154,23 +213,35 @@ fn main() {
             tray_quit,
         ])
         .setup(|app| {
-            // --- Fixed main window: enforce at runtime too (belt + braces
-            //     with tauri.conf.json min/max + resizable/maximizable false).
+            // --- Adaptive main window (v3.0.3): fit the design size to
+            //     the monitor — 1280x1024 on big screens, scaled down on
+            //     smaller laptops. NEVER fullscreen: always a floating
+            //     rectangle. The window starts hidden (tauri.conf.json)
+            //     so a small screen never flashes the full-size frame.
             if let Some(main) = app.get_webview_window("main") {
                 let _ = main.set_resizable(false);
                 let _ = main.set_maximizable(false);
-                let fixed = Some(Size::Logical(LogicalSize::new(MAIN_W, MAIN_H)));
-                let _ = main.set_min_size(fixed);
-                let _ = main.set_max_size(fixed);
+                fit_main_window(app.handle(), true);
                 // Close button hides to tray instead of quitting, so the
                 // tray icon stays alive; real quit is via the tray popup.
                 let win = main.clone();
-                main.on_window_event(move |event| {
-                    if let WindowEvent::CloseRequested { api, .. } = event {
+                let app_handle = app.handle().clone();
+                main.on_window_event(move |event| match event {
+                    WindowEvent::CloseRequested { api, .. } => {
                         api.prevent_close();
                         let _ = win.hide();
                     }
+                    // Monitor changed (resolution / DPI / moved to another
+                    // screen): re-fit immediately so the frame always fits.
+                    WindowEvent::ScaleFactorChanged { .. } => {
+                        fit_main_window(&app_handle, false);
+                    }
+                    WindowEvent::Focused(true) => {
+                        fit_main_window(&app_handle, false);
+                    }
+                    _ => {}
                 });
+                let _ = main.show();
             }
 
             // --- Tray popup: auto-hide when it loses focus.
