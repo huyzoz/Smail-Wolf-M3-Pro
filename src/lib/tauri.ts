@@ -107,6 +107,12 @@ export function batteryPercent(state: BatteryState | null): number {
   return Math.max(0, Math.min(100, Math.round((state.remaining_mah / BATTERY_USABLE_MAH) * 100)));
 }
 
+/** Battery % with 1 decimal — display only, so the drain is visible (see battery.ts percentOfPrecise). */
+export function batteryPercentPrecise(state: BatteryState | null): number {
+  if (!state) return 100;
+  return Math.max(0, Math.min(100, Math.round((state.remaining_mah / BATTERY_USABLE_MAH) * 1000) / 10));
+}
+
 // ---------------------------------------------------------------------------
 // Native notification — Rust command: notify_low_battery() -> ()
 // Fires the Windows notification "Chuột của bạn còn 20% pin, vui lòng sạc pin".

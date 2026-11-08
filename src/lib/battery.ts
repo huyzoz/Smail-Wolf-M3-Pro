@@ -80,6 +80,17 @@ export function percentOf(state: BatteryState | null): number {
   return Math.max(0, Math.min(100, Math.round((state.remaining_mah / USABLE_MAH) * 100)));
 }
 
+/**
+ * % with 1 decimal (0–100.0) — for DISPLAY only, so the drain is actually
+ * visible: at 125 Hz (3 mA) the % drops 0.1 every ~8 min, 1 mAh every
+ * ~20 min. The integer % would sit at 100% for the first 13 hours.
+ * Logic (low-battery threshold, saver) keeps using integer percentOf.
+ */
+export function percentOfPrecise(state: BatteryState | null): number {
+  if (!state) return 100;
+  return Math.max(0, Math.min(100, Math.round((state.remaining_mah / USABLE_MAH) * 1000) / 10));
+}
+
 /** Fresh state: full usable charge. Used ONLY on first run (no saved state). */
 export function defaultState(nowSeconds: number, pollingRateHz = 125): BatteryState {
   return {
