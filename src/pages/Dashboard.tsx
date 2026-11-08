@@ -9,13 +9,13 @@
 import { Play, RefreshCw } from 'lucide-react';
 import { useMouse } from '../store';
 import { CardTitle, Donut, GlassButton, GlassCard, PageHead } from '../components/ui';
-import { runtimeHours } from '../lib/battery';
+import { runtimeHours, drainMaAt } from '../lib/battery';
 
 export default function Dashboard({ bare = false }: { bare?: boolean }): React.JSX.Element {
   const {
     keys, version, mouseName, wired, mode,
     connected, busy, dpiListening, refresh, simulateDpiPush, listenDpiPush,
-    simPct, simCharging, simSaver, simRemainingMah, simPollingHz,
+    simPct, simPctPrecise, simCharging, simSaver, simRemainingMah, simPollingHz,
   } = useMouse();
 
   return (
@@ -39,11 +39,11 @@ export default function Dashboard({ bare = false }: { bare?: boolean }): React.J
             tới lúc yếu, không có chip đo pin thật. Giá trị report 48
             KHÔNG hiện ra UI nữa. Đèn LED trên chuột vẫn là chỉ báo thật. */}
         <Donut
-          value={simPct}
+          value={simPctPrecise}
           size={92}
           accent={simSaver ? '#eab308' : '#ea580c'}
           label={simCharging ? 'Đang sạc (ước tính)' : simSaver ? 'Pin còn lại — Tiết kiệm pin (ước tính)' : 'Pin còn lại (ước tính)'}
-          sub={`${Math.round(simRemainingMah)} / 400 mAh · polling ${simPollingHz} Hz · còn ~${Math.round(runtimeHours(simPollingHz) * (simPct / 100))} giờ ở mức hiện tại`}
+          sub={`${simRemainingMah.toFixed(1)} / 400 mAh · polling ${simPollingHz} Hz · ${simCharging ? 'đang sạc +150 mA' : `đang xả −${drainMaAt(simPollingHz)} mA · còn ~${Math.round(runtimeHours(simPollingHz) * (simPct / 100))} giờ ở mức hiện tại`}`}
         />
         <div className="mt-3 border-t border-white/10 pt-3">
           <div className="flex items-center justify-between gap-2">

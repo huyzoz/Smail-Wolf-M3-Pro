@@ -15,6 +15,14 @@ import { Download, RotateCcw, Save, Upload } from 'lucide-react';
 import { hexDump, verifyChecksum } from '../lib/hid';
 import { useMouse } from '../store';
 import { autostartGet, autostartSet, isTauri } from '../lib/tauri';
+import {
+  checkAppUpdate,
+  refreshAppUpdate,
+  openUpdateSetup,
+  openReleasePage,
+  formatReleaseTime,
+  type AppUpdateInfo,
+} from '../lib/updater';
 import { CardTitle, ConfirmModal, EmptyState, FieldLabel, GlassButton, GlassCard, Toggle } from '../components/ui';
 
 /** v3.1 — Pin (mô phỏng) + khởi động cùng Windows. Đặt ở tab Khác. */
@@ -74,6 +82,19 @@ export function BatteryCard(): React.JSX.Element {
 
 export function FirmwareCard(): React.JSX.Element {
   const { version, mouseName, wired, mode, connected } = useMouse();
+  // v3.0.2 — kiểm tra bản cập nhật của CHÍNH app này từ repo GitHub
+  // (duyzoz/Smail-Wolf-M3-Pro), không còn trỏ app gốc. undefined = đang
+  // kiểm tra, null = không kiểm tra được (mất mạng — im lặng, không báo lỗi).
+  const [update, setUpdate] = useState<AppUpdateInfo | null | undefined>(undefined);
+  useEffect(() => {
+    let alive = true;
+    void checkAppUpdate().then((info) => {
+      if (alive) setUpdate(info);
+    });
+    return () => {
+      alive = false;
+    };
+  }, []);
   return (
     <div className="uiv-blueglass">
       <div className="uiv-blueglass-top">
@@ -88,7 +109,53 @@ export function FirmwareCard(): React.JSX.Element {
       </p>
       <div className="px-4 pb-4">
         <div className="rounded-xl border border-amber-300/30 bg-amber-400/10 p-3 text-[13px] leading-relaxed text-amber-100">
-          Không cập nhật ở đây. Protocol đo trên 2.1.3 — lên V3.1.2 có thể đổi protocol. Dùng app gốc, cắm dây.
+          Protocol đo trên 2.1.3 — lên V3.1.2 có thể đổi protocol. Muốn cập nhật firmware chuột thì dùng app gốc, cắm dây.
+        </div>
+        {/* Cập nhật ỨNG DỤNG (driver này) — lấy từ release mới nhất của repo */}
+        <div className="mt-3 rounded-xl border border-white/10 bg-white/5 p-3">
+          <div className="text-[13px] font-semibold text-white/90">Cập nhật ứng dụng</div>
+          {update === undefined ? (
+            <p className="mt-1 text-[13px] leading-relaxed text-white/60">Đang kiểm tra bản cập nhật…</p>
+          ) : update === null ? (
+            <p className="mt-1 text-[13px] leading-relaxed text-white/60">
+              Không kiểm tra được cập nhật (mất mạng?).{' '}
+              <button
+                type="button"
+                className="font-semibold text-white underline underline-offset-2"
+                onClick={() => {
+                  setUpdate(undefined);
+                  void refreshAppUpdate().then((info) => setUpdate(info));
+                }}
+              >
+                Thử lại
+              </button>
+            </p>
+          ) : update.available ? (
+            <div className="mt-2 space-y-2">
+              <p className="text-[13px] leading-relaxed text-orange-200">
+                Đã có bản cập nhật mới <span className="font-bold">v{update.latestVersion}</span>
+                {' '}· phát hành {formatReleaseTime(update.publishedAt)}
+              </p>
+              {update.notes.trim() !== '' && (
+                <details className="text-[13px] leading-relaxed text-white/70">
+                  <summary className="cursor-pointer font-semibold text-white/85">Có gì mới</summary>
+                  <p className="mt-1 max-h-32 overflow-y-auto whitespace-pre-line pr-1">{update.notes.trim()}</p>
+                </details>
+              )}
+              <div className="flex flex-wrap gap-2 pt-1">
+                <GlassButton variant="primary" onClick={() => void openUpdateSetup(update)}>
+                  <Download className="h-4 w-4" /> Tải bản cài đặt
+                </GlassButton>
+                <GlassButton variant="ghost" onClick={() => void openReleasePage(update)}>
+                  Xem trên GitHub
+                </GlassButton>
+              </div>
+            </div>
+          ) : (
+            <p className="mt-1 text-[13px] leading-relaxed text-emerald-200">
+              Đang dùng bản mới nhất v{update.currentVersion}.
+            </p>
+          )}
         </div>
       </div>
     </div>
