@@ -232,7 +232,7 @@ export default function DevicePicker(): React.JSX.Element {
     'group flex w-full max-w-[240px] flex-col items-center rounded-2xl border border-[var(--line-paper)] bg-[var(--surface)] p-5 text-center shadow-[0_8px_24px_rgba(22,22,26,0.08)] transition hover:-translate-y-1 hover:border-[#ff5a1f]/60 hover:shadow-[0_12px_28px_rgba(234,88,12,0.18)] focus-visible:outline-2 focus-visible:outline-[#ff5a1f] active:scale-[0.98] disabled:opacity-50';
 
   return (
-    <div className="picker-bg relative flex min-h-dvh flex-col items-center justify-center overflow-hidden px-4 py-10" data-testid="device-picker">
+    <div className="picker-bg relative flex min-h-dvh flex-col items-center justify-center overflow-hidden px-4 py-8" data-testid="device-picker">
       <PickerFx />
       {/* Logo brand 800px (map theo theme) — góc trên trái. */}
       <div className="absolute top-6 left-6 z-10">
