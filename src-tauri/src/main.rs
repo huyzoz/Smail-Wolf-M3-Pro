@@ -175,6 +175,61 @@ fn tray_quit(app: tauri::AppHandle) {
 }
 
 // ---------------------------------------------------------------------------
+// Self-update (v3.0.6)
+// ---------------------------------------------------------------------------
+
+/// Real self-update: download the newest .setup to %TEMP%, launch it,
+/// then quit this process entirely so the installer can replace the
+/// running exe. Uses Windows' built-in curl.exe (Win10 1803+ / Win11)
+/// — no new crates. Sync fn: Tauri runs it on its thread pool, so the
+/// blocking curl download is fine.
+/// On success this function never returns (app.exit ends the process);
+/// the frontend treats "invoke resolved" as "installer is launching".
+/// On failure it returns a human-readable Vietnamese error message.
+#[tauri::command]
+fn install_update(app: tauri::AppHandle, url: String, filename: String) -> Result<(), String> {
+    let tmp_path = std::env::temp_dir().join(&filename);
+    let tmp_str = tmp_path.to_string_lossy().to_string();
+    // 1. Download — -L follows GitHub's redirect to objects.githubusercontent.com.
+    let out = std::process::Command::new("curl.exe")
+        .args([
+            "-L",
+            "--fail",
+            "--silent",
+            "--show-error",
+            "-o",
+            &tmp_str,
+            &url,
+        ])
+        .output()
+        .map_err(|e| format!("Không chạy được curl.exe: {e}"))?;
+    if !out.status.success() {
+        let detail = String::from_utf8_lossy(&out.stderr).trim().to_string();
+        return Err(if detail.is_empty() {
+            "Tải bản cài đặt thất bại (mất mạng?).".to_string()
+        } else {
+            format!("Tải bản cài đặt thất bại: {detail}")
+        });
+    }
+    // 2. Sanity check: the real setup is ~18 MB — anything tiny is an
+    //    error page that got saved instead of the installer.
+    let size = std::fs::metadata(&tmp_path).map(|m| m.len()).unwrap_or(0);
+    if size < 1_000_000 {
+        return Err(format!(
+            "File tải về chỉ {size} byte — link có thể đã đổi, thử lại hoặc mở trên GitHub."
+        ));
+    }
+    // 3. Launch the installer, then quit this process entirely. The NSIS
+    //    wizard shows first; files are only replaced after the user clicks
+    //    Install, so the app is long gone by then.
+    std::process::Command::new(&tmp_path)
+        .spawn()
+        .map_err(|e| format!("Không mở được bộ cài: {e}"))?;
+    app.exit(0);
+    Ok(())
+}
+
+// ---------------------------------------------------------------------------
 // Tray popup positioning
 // ---------------------------------------------------------------------------
 
@@ -229,6 +284,7 @@ fn main() {
             notify_low_battery,
             tray_show_main,
             tray_quit,
+            install_update,
         ])
         .setup(|app| {
             // --- Adaptive main window (v3.0.3): fit the design size to
