@@ -489,6 +489,58 @@ export function ConfirmModal({
   );
 }
 
+// --- Slide-up confirm modal (v3.0.4, update confirm) ---
+// Giống ConfirmModal nhưng panel TRƯỢT LÊN từ giữa màn hình (y: 24 -> 0)
+// thay vì scale — dùng cho xác nhận cập nhật: "Bạn có muốn cập nhật lên
+// v... không?" + dòng ghi phiên bản cũ sẽ được gỡ, thay bằng bản mới.
+export function SlideUpConfirmModal({
+  open,
+  title,
+  children,
+  confirmLabel,
+  onConfirm,
+  onCancel,
+}: {
+  open: boolean;
+  title: string;
+  children: ReactNode;
+  confirmLabel: string;
+  onConfirm: () => void;
+  onCancel: () => void;
+}): React.JSX.Element | null {
+  useScrollLock(open);
+  if (!open) return null;
+  return createPortal(
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm"
+      role="dialog"
+      aria-modal="true"
+      aria-label={title}
+      onClick={onCancel}
+    >
+      <motion.div
+        initial={{ opacity: 0, y: 24 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.22, ease: 'easeOut' }}
+        className="panel-card w-full max-w-md p-6"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <h3 className="text-lg font-bold text-[#edebe6]">{title}</h3>
+        <div className="mt-3 text-sm leading-relaxed text-[#c9c9d6]">{children}</div>
+        <div className="mt-6 flex justify-end gap-3">
+          <GlassButton variant="ghost" onClick={onCancel}>
+            Hủy
+          </GlassButton>
+          <GlassButton variant="primary" onClick={onConfirm}>
+            {confirmLabel}
+          </GlassButton>
+        </div>
+      </motion.div>
+    </div>,
+    document.body,
+  );
+}
+
 // --- Square snake loader (Uiverse grumpy-stingray-26, dark bg only) ---
 export function SnakeLoader({ label }: { label?: string }): React.JSX.Element {
   return (
