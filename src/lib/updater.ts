@@ -1,11 +1,19 @@
 /**
- * App update checker — src/lib/updater.ts (v3.0.2)
+ * App update checker — src/lib/updater.ts (v3.0.4)
  *
  * Checks THIS repo's latest release (duyzoz/Smail-Wolf-M3-Pro), NOT the
  * original vendor app — the old FirmwareCard pointed at the original app
  * and said "don't update here". Now the app checks its own repo:
  * GET https://api.github.com/repos/duyzoz/Smail-Wolf-M3-Pro/releases/latest
  * and compares the tag with the running app version (getVersion()).
+ *
+ * v3.0.4 ROOT CAUSE — the check NEVER worked in the built app: the fetch
+ * to api.github.com was blocked by the Tauri CSP (connect-src had no
+ * api.github.com), so every check failed silently and no update popup
+ * ever appeared. tauri.conf.json connect-src MUST include
+ * https://api.github.com (the sandbox dev server does NOT enforce the
+ * Tauri CSP, so this only shows up in the real build — never trust a
+ * dev-server fetch as proof the built app can reach an API).
  *
  * Silent on failure (offline, timeout, rate-limit): returns null, the UI
  * shows a quiet "couldn't check" line — never an error toast, never a
@@ -18,7 +26,7 @@ import { openUrl } from '@tauri-apps/plugin-opener';
 export const APP_REPO = 'duyzoz/Smail-Wolf-M3-Pro';
 const LATEST_RELEASE_API = `https://api.github.com/repos/${APP_REPO}/releases/latest`;
 /** Fallback when getVersion() is unavailable (plain browser / dev). Bump with releases. */
-export const FALLBACK_APP_VERSION = '3.0.3';
+export const FALLBACK_APP_VERSION = '3.0.4';
 
 export interface AppUpdateInfo {
   available: boolean;
@@ -64,12 +72,32 @@ export function formatReleaseTime(iso: string): string {
   }).format(d);
 }
 
+/** "2026-11-09T01:52:12Z" -> "Thứ Hai, 09/11/2026, 08:52" (local timezone).
+ *  Dùng cho popup cập nhật: người dùng thấy rõ "thứ mấy" + giờ phát hành. */
+export function formatReleaseTimeWithWeekday(iso: string): string {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return iso;
+  return new Intl.DateTimeFormat('vi-VN', {
+    weekday: 'long',
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  }).format(d);
+}
+
 export async function currentAppVersion(): Promise<string> {
   try {
     return await getVersion();
   } catch {
     return FALLBACK_APP_VERSION;
   }
+}
+
+/** Release tag của app đang chạy, VD "v3.0.4-rust" — hiện ở thẻ Firmware. */
+export async function currentAppVersionTag(): Promise<string> {
+  return `v${await currentAppVersion()}-rust`;
 }
 
 let cached: Promise<AppUpdateInfo | null> | null = null;
