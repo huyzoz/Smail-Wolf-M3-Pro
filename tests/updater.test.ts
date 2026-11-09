@@ -8,7 +8,9 @@ import {
   compareVersions,
   evaluateRelease,
   formatReleaseTime,
+  formatReleaseTimeWithWeekday,
   parseReleaseVersion,
+  setupFileName,
 } from '../src/lib/updater';
 
 let pass = 0;
@@ -57,6 +59,40 @@ eq('no setup asset -> setupUrl null', evaluateRelease({ tag_name: 'v3.0.3-rust',
 
 const t = formatReleaseTime('2026-11-08T16:31:39Z');
 eq('formatReleaseTime shows date + time', t.includes('08/11/2026') && t.includes('23:31'), true);
+
+const tw1 = formatReleaseTimeWithWeekday('2026-11-09T01:52:12Z');
+eq('formatReleaseTimeWithWeekday shows Monday', tw1.includes('Thứ Hai') && tw1.includes('09/11/2026'), true);
+const tw2 = formatReleaseTimeWithWeekday('2026-11-08T16:31:39Z');
+eq('formatReleaseTimeWithWeekday shows Sunday', tw2.includes('Chủ Nhật') && tw2.includes('08/11/2026'), true);
+
+// v3.0.6 — setup file name for the Rust install_update command.
+const infoBase = {
+  available: true,
+  currentVersion: '3.0.5',
+  latestVersion: '3.0.6',
+  latestTag: 'v3.0.6-rust',
+  publishedAt: '2026-11-09T02:45:00Z',
+  notes: '',
+  releaseUrl: 'https://github.com/duyzoz/Smail-Wolf-M3-Pro/releases/tag/v3.0.6-rust',
+} as const;
+eq(
+  'setupFileName takes basename from setupUrl',
+  setupFileName({
+    ...infoBase,
+    setupUrl: 'https://github.com/duyzoz/Smail-Wolf-M3-Pro/releases/download/v3.0.6-rust/SMAILWOLF-M3-Pro-Driver_3.0.6_x64-setup.exe',
+  }),
+  'SMAILWOLF-M3-Pro-Driver_3.0.6_x64-setup.exe',
+);
+eq(
+  'setupFileName falls back when setupUrl is null',
+  setupFileName({ ...infoBase, setupUrl: null }),
+  'SMAILWOLF-M3-Pro-Driver_3.0.6_x64-setup.exe',
+);
+eq(
+  'setupFileName falls back when URL has no .exe basename',
+  setupFileName({ ...infoBase, setupUrl: 'https://example.invalid/releases/tag/v3.0.6-rust' }),
+  'SMAILWOLF-M3-Pro-Driver_3.0.6_x64-setup.exe',
+);
 
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail === 0 ? 0 : 1);
