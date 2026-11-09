@@ -27,7 +27,8 @@ import { Marquee, Toasts, SlideUpConfirmModal } from './components/ui';
 import { pollingHz } from './lib/hid';
 import {
   checkAppUpdate,
-  openUpdateSetup,
+  installUpdate,
+  openReleasePage,
   formatReleaseTimeWithWeekday,
   type AppUpdateInfo,
 } from './lib/updater';
@@ -213,6 +214,11 @@ function AppUpdateGate(): React.JSX.Element | null {
   const [info, setInfo] = useState<AppUpdateInfo | null>(null);
   const [toastOpen, setToastOpen] = useState(false);
   const [confirmOpen, setConfirmOpen] = useState(false);
+  // v3.0.6 — real self-update flow: downloading state + error + retry.
+  // On success the Rust side quits the whole process, so installUpdate()
+  // never resolves — no success UI is needed here.
+  const [installing, setInstalling] = useState(false);
+  const [installError, setInstallError] = useState<string | null>(null);
   useEffect(() => {
     let alive = true;
     void checkAppUpdate().then((res) => {
@@ -227,6 +233,14 @@ function AppUpdateGate(): React.JSX.Element | null {
     if (info && !loading) setToastOpen(true);
   }, [info, loading]);
   if (!info) return null;
+  const handleConfirm = () => {
+    setInstallError(null);
+    setInstalling(true);
+    void installUpdate(info).catch((e: unknown) => {
+      setInstalling(false);
+      setInstallError(e instanceof Error ? e.message : String(e));
+    });
+  };
   return (
     <>
       {toastOpen && (
@@ -262,18 +276,29 @@ function AppUpdateGate(): React.JSX.Element | null {
       <SlideUpConfirmModal
         open={confirmOpen}
         title={`Bạn có muốn cập nhật lên v${info.latestVersion} không?`}
-        confirmLabel="Xác nhận"
-        onConfirm={() => {
+        confirmLabel={installError ? 'Thử lại' : installing ? 'Đang tải…' : 'Xác nhận'}
+        confirmDisabled={installing}
+        extraActionLabel={installError ? 'Mở trên GitHub' : undefined}
+        onExtraAction={installError ? () => void openReleasePage(info) : undefined}
+        onConfirm={handleConfirm}
+        onCancel={() => {
+          if (installing) return;
           setConfirmOpen(false);
-          setToastOpen(false);
-          void openUpdateSetup(info);
+          setInstallError(null);
         }}
-        onCancel={() => setConfirmOpen(false)}
       >
         <p>
           Phiên bản hiện tại (v{info.currentVersion}) sẽ được gỡ và thay bằng v{info.latestVersion} — bản
           chỉnh sửa, vá lỗi, tính năng mới.
         </p>
+        {installing && (
+          <p className="mt-2 font-semibold text-orange-200">
+            Đang tải bản cài đặt mới về máy… tải xong app sẽ tự tắt và mở bộ cài.
+          </p>
+        )}
+        {installError && (
+          <p className="mt-2 font-semibold text-red-300">Không cập nhật được: {installError}</p>
+        )}
         {info.notes.trim() !== '' && (
           <div className="mt-2 max-h-40 overflow-y-auto rounded-lg bg-black/20 p-3 whitespace-pre-line">
             {info.notes.trim()}
