@@ -500,6 +500,9 @@ export function SlideUpConfirmModal({
   confirmLabel,
   onConfirm,
   onCancel,
+  confirmDisabled = false,
+  extraActionLabel,
+  onExtraAction,
 }: {
   open: boolean;
   title: string;
@@ -507,6 +510,11 @@ export function SlideUpConfirmModal({
   confirmLabel: string;
   onConfirm: () => void;
   onCancel: () => void;
+  /** v3.0.6 — disable the confirm button while an update is downloading. */
+  confirmDisabled?: boolean;
+  /** v3.0.6 — optional third action on the left (e.g. "Mở trên GitHub" on error). */
+  extraActionLabel?: string;
+  onExtraAction?: () => void;
 }): React.JSX.Element | null {
   useScrollLock(open);
   if (!open) return null;
@@ -528,10 +536,15 @@ export function SlideUpConfirmModal({
         <h3 className="text-lg font-bold text-[#edebe6]">{title}</h3>
         <div className="mt-3 text-sm leading-relaxed text-[#c9c9d6]">{children}</div>
         <div className="mt-6 flex justify-end gap-3">
+          {extraActionLabel && onExtraAction ? (
+            <GlassButton variant="ghost" onClick={onExtraAction} className="mr-auto">
+              {extraActionLabel}
+            </GlassButton>
+          ) : undefined}
           <GlassButton variant="ghost" onClick={onCancel}>
             Hủy
           </GlassButton>
-          <GlassButton variant="primary" onClick={onConfirm}>
+          <GlassButton variant="primary" onClick={onConfirm} disabled={confirmDisabled}>
             {confirmLabel}
           </GlassButton>
         </div>
