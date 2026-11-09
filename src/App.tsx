@@ -152,8 +152,8 @@ function Root(): React.JSX.Element {
   const [sweepKey, setSweepKey] = useState(0);
   const firstTheme = useRef(true);
   // v3.0.3 — adaptive window: Rust sizes the frame to the monitor
-  // (1280x1024 x scale, never fullscreen). Zoom the whole document so
-  // the 1280x1024 design always fills the frame exactly — every layer
+  // (1280x720 x scale, never fullscreen). Zoom the whole document so
+  // the 1280x720 design always fills the frame exactly — every layer
   // stays intact, nothing reflows or clips. Clamped [0.4, 1]: never zoom
   // in, never shrink past readable. The tray popup is a separate window
   // and never gets this zoom (it renders TrayPopupPage, not Root).
@@ -168,7 +168,7 @@ function Root(): React.JSX.Element {
       const physicalH = window.innerHeight * current;
       const z = Math.min(
         1,
-        Math.max(0.4, Math.min(physicalW / 1280, physicalH / 1024)),
+        Math.max(0.4, Math.min(physicalW / 1280, physicalH / 720)),
       );
       document.documentElement.style.zoom = String(z);
     };
