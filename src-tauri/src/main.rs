@@ -22,9 +22,11 @@ use tauri_plugin_notification::NotificationExt;
 /// Design size the UI is built for. The window is this big on large
 /// screens and scales DOWN to fit smaller monitors — never fullscreen,
 /// always a floating rectangle (Ethan's hard rule).
+/// v3.0.5: 16:9 (1280x720) — the old 1280x1024 was 5:4, nearly square;
+/// Ethan wants a proper wide rectangle (x720, landscape — NOT portrait).
 const DESIGN_W: f64 = 1280.0;
-const DESIGN_H: f64 = 1024.0;
-/// Smallest the window may shrink to (scale 0.5 -> 640x512). Below that
+const DESIGN_H: f64 = 720.0;
+/// Smallest the window may shrink to (scale 0.5 -> 640x360). Below that
 /// the UI would be unreadable; the window just fits as well as it can.
 const MIN_SCALE: f64 = 0.5;
 /// Horizontal margin so the fitted window isn't flush to the screen edges.
@@ -230,7 +232,7 @@ fn main() {
         ])
         .setup(|app| {
             // --- Adaptive main window (v3.0.3): fit the design size to
-            //     the monitor — 1280x1024 on big screens, scaled down on
+            //     the monitor — 1280x720 on big screens, scaled down on
             //     smaller laptops. NEVER fullscreen: always a floating
             //     rectangle. The window starts hidden (tauri.conf.json)
             //     so a small screen never flashes the full-size frame.
