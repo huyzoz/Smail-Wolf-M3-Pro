@@ -18,7 +18,7 @@ import { autostartGet, autostartSet, isTauri } from '../lib/tauri';
 import {
   checkAppUpdate,
   refreshAppUpdate,
-  openUpdateSetup,
+  installUpdate,
   openReleasePage,
   formatReleaseTimeWithWeekday,
   currentAppVersionTag,
@@ -84,6 +84,9 @@ export function FirmwareCard(): React.JSX.Element {
   // Tag version lấy động từ app đang chạy (VD "v3.0.4-rust").
   const [appTag, setAppTag] = useState(`v${FALLBACK_APP_VERSION}-rust`);
   const [confirmOpen, setConfirmOpen] = useState(false);
+  // v3.0.6 — real self-update flow: downloading state + error + retry.
+  const [installing, setInstalling] = useState(false);
+  const [installError, setInstallError] = useState<string | null>(null);
   // v3.0.2 — kiểm tra bản cập nhật của CHÍNH app này từ repo GitHub
   // (duyzoz/Smail-Wolf-M3-Pro). undefined = đang kiểm tra, null = không
   // kiểm tra được (mất mạng — im lặng, không báo lỗi).
@@ -160,17 +163,36 @@ export function FirmwareCard(): React.JSX.Element {
         <SlideUpConfirmModal
           open={confirmOpen}
           title={`Bạn có muốn cập nhật lên v${update.latestVersion} không?`}
-          confirmLabel="Xác nhận"
+          confirmLabel={installError ? 'Thử lại' : installing ? 'Đang tải…' : 'Xác nhận'}
+          confirmDisabled={installing}
+          extraActionLabel={installError ? 'Mở trên GitHub' : undefined}
+          onExtraAction={installError ? () => void openReleasePage(update) : undefined}
           onConfirm={() => {
-            setConfirmOpen(false);
-            void openUpdateSetup(update);
+            setInstallError(null);
+            setInstalling(true);
+            void installUpdate(update).catch((e: unknown) => {
+              setInstalling(false);
+              setInstallError(e instanceof Error ? e.message : String(e));
+            });
           }}
-          onCancel={() => setConfirmOpen(false)}
+          onCancel={() => {
+            if (installing) return;
+            setConfirmOpen(false);
+            setInstallError(null);
+          }}
         >
           <p>
             Phiên bản hiện tại (v{update.currentVersion}) sẽ được gỡ và thay bằng v{update.latestVersion} — bản
             chỉnh sửa, vá lỗi, tính năng mới.
           </p>
+          {installing && (
+            <p className="mt-2 font-semibold text-orange-200">
+              Đang tải bản cài đặt mới về máy… tải xong app sẽ tự tắt và mở bộ cài.
+            </p>
+          )}
+          {installError && (
+            <p className="mt-2 font-semibold text-red-300">Không cập nhật được: {installError}</p>
+          )}
         </SlideUpConfirmModal>
       ) : undefined}
     </div>
