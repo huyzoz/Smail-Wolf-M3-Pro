@@ -9,13 +9,12 @@
 import { Play, RefreshCw } from 'lucide-react';
 import { useMouse } from '../store';
 import { CardTitle, Donut, GlassButton, GlassCard, PageHead } from '../components/ui';
-import { runtimeHours, drainMaAt } from '../lib/battery';
 
 export default function Dashboard({ bare = false }: { bare?: boolean }): React.JSX.Element {
   const {
     keys, version, mouseName, wired, mode,
     connected, busy, dpiListening, refresh, simulateDpiPush, listenDpiPush,
-    simPct, simPctPrecise, simCharging, simSaver, simRemainingMah, simPollingHz,
+    simPctPrecise, simCharging, simSaver,
   } = useMouse();
 
   return (
@@ -43,18 +42,7 @@ export default function Dashboard({ bare = false }: { bare?: boolean }): React.J
           size={92}
           accent={simSaver ? '#eab308' : '#ea580c'}
           label={simCharging ? 'Đang sạc (ước tính)' : simSaver ? 'Pin còn lại — Tiết kiệm pin (ước tính)' : 'Pin còn lại (ước tính)'}
-          sub={`${simRemainingMah.toFixed(1)} / 400 mAh · polling ${simPollingHz} Hz · ${simCharging ? 'đang sạc +150 mA' : `đang xả −${drainMaAt(simPollingHz)} mA · còn ~${Math.round(runtimeHours(simPollingHz) * (simPct / 100))} giờ ở mức hiện tại`}`}
         />
-        <div className="mt-3 border-t border-white/10 pt-3">
-          <div className="flex items-center justify-between gap-2">
-            <span className="text-sm font-semibold text-[#edebe6]">Pin ước tính — theo polling rate</span>
-          </div>
-          <p className="mt-2 text-xs leading-relaxed text-[#a2a2b0]">
-            125 Hz → 3 mA (~133 giờ) · 250 Hz → 5 mA (~80 giờ) · 500 Hz → 8 mA (~50 giờ) · 1000 Hz → 14 mA
-            (~29 giờ). Sạc dây: +150 mA/giờ (giả định, xem README). Đèn LED đỏ sáng = đang sạc, tắt = đầy,
-            nhấp nháy = sắp hết — LED mới là chỉ báo thật.
-          </p>
-        </div>
         <div className="mt-3 grid grid-cols-1 gap-y-1.5 border-t border-white/10 pt-3 text-[13px]">
           <div className="flex justify-between gap-2">
             <span className="shrink-0 text-[#a2a2b0]">Tên chuột</span>

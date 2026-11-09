@@ -20,10 +20,12 @@ import {
   refreshAppUpdate,
   openUpdateSetup,
   openReleasePage,
-  formatReleaseTime,
+  formatReleaseTimeWithWeekday,
+  currentAppVersionTag,
+  FALLBACK_APP_VERSION,
   type AppUpdateInfo,
 } from '../lib/updater';
-import { CardTitle, ConfirmModal, EmptyState, FieldLabel, GlassButton, GlassCard, Toggle } from '../components/ui';
+import { CardTitle, ConfirmModal, EmptyState, FieldLabel, GlassButton, GlassCard, SlideUpConfirmModal, Toggle } from '../components/ui';
 
 /** v3.1 — Pin (mô phỏng) + khởi động cùng Windows. Đặt ở tab Khác. */
 export function BatteryCard(): React.JSX.Element {
@@ -51,10 +53,6 @@ export function BatteryCard(): React.JSX.Element {
           onChange={(v) => void setBatterySaver(v)}
           label="Tiết kiệm pin"
         />
-        <p className="text-xs leading-relaxed text-[#a2a2b0]">
-          Bật: khóa polling 125 Hz + DPI 1600 (ghi xuống chuột qua setConfig), thanh pin chuyển vàng. Tắt: khôi
-          phục polling + DPI cũ. % pin là ước tính — xem mục Pin ở thẻ Thiết bị &amp; pin.
-        </p>
         <div className="border-t border-white/10 pt-3">
           <Toggle
             checked={autostart ?? false}
@@ -81,13 +79,20 @@ export function BatteryCard(): React.JSX.Element {
 }
 
 export function FirmwareCard(): React.JSX.Element {
-  const { version, mouseName, wired, mode, connected } = useMouse();
+  // v3.0.4 — thẻ này là PHIÊN BẢN APP + cập nhật (không còn firmware chuột
+  // hay app gốc ở đây: firmware chuột vẫn hiện ở tab Thiết bị & pin).
+  // Tag version lấy động từ app đang chạy (VD "v3.0.4-rust").
+  const [appTag, setAppTag] = useState(`v${FALLBACK_APP_VERSION}-rust`);
+  const [confirmOpen, setConfirmOpen] = useState(false);
   // v3.0.2 — kiểm tra bản cập nhật của CHÍNH app này từ repo GitHub
-  // (duyzoz/Smail-Wolf-M3-Pro), không còn trỏ app gốc. undefined = đang
-  // kiểm tra, null = không kiểm tra được (mất mạng — im lặng, không báo lỗi).
+  // (duyzoz/Smail-Wolf-M3-Pro). undefined = đang kiểm tra, null = không
+  // kiểm tra được (mất mạng — im lặng, không báo lỗi).
   const [update, setUpdate] = useState<AppUpdateInfo | null | undefined>(undefined);
   useEffect(() => {
     let alive = true;
+    void currentAppVersionTag().then((tag) => {
+      if (alive) setAppTag(tag);
+    });
     void checkAppUpdate().then((info) => {
       if (alive) setUpdate(info);
     });
@@ -99,20 +104,13 @@ export function FirmwareCard(): React.JSX.Element {
     <div className="uiv-blueglass">
       <div className="uiv-blueglass-top">
         <div className="font-mono2 text-[11px] font-semibold tracking-[0.18em] text-white/80 uppercase">
-          Firmware · PAW3311
+          Firmware · duyzoz
         </div>
-        <div className="title font-display">v{version || '—'}</div>
+        <div className="title font-display">{appTag}</div>
       </div>
-      <p className="desc">
-        Bản mới nhất app gốc báo: V3.1.2 · Tên chuột {mouseName || '—'} ·{' '}
-        {!connected ? 'Chưa kết nối' : mode === 'demo' ? 'Mô phỏng · Demo' : wired ? 'Có dây (USB) · Live' : '2.4G (dongle) · Live'}
-      </p>
       <div className="px-4 pb-4">
-        <div className="rounded-xl border border-amber-300/30 bg-amber-400/10 p-3 text-[13px] leading-relaxed text-amber-100">
-          Protocol đo trên 2.1.3 — lên V3.1.2 có thể đổi protocol. Muốn cập nhật firmware chuột thì dùng app gốc, cắm dây.
-        </div>
         {/* Cập nhật ỨNG DỤNG (driver này) — lấy từ release mới nhất của repo */}
-        <div className="mt-3 rounded-xl border border-white/10 bg-white/5 p-3">
+        <div className="rounded-xl border border-white/10 bg-white/5 p-3">
           <div className="text-[13px] font-semibold text-white/90">Cập nhật ứng dụng</div>
           {update === undefined ? (
             <p className="mt-1 text-[13px] leading-relaxed text-white/60">Đang kiểm tra bản cập nhật…</p>
@@ -134,7 +132,7 @@ export function FirmwareCard(): React.JSX.Element {
             <div className="mt-2 space-y-2">
               <p className="text-[13px] leading-relaxed text-orange-200">
                 Đã có bản cập nhật mới <span className="font-bold">v{update.latestVersion}</span>
-                {' '}· phát hành {formatReleaseTime(update.publishedAt)}
+                {' '}· phát hành {formatReleaseTimeWithWeekday(update.publishedAt)}
               </p>
               {update.notes.trim() !== '' && (
                 <details className="text-[13px] leading-relaxed text-white/70">
@@ -143,8 +141,8 @@ export function FirmwareCard(): React.JSX.Element {
                 </details>
               )}
               <div className="flex flex-wrap gap-2 pt-1">
-                <GlassButton variant="primary" onClick={() => void openUpdateSetup(update)}>
-                  <Download className="h-4 w-4" /> Tải bản cài đặt
+                <GlassButton variant="primary" onClick={() => setConfirmOpen(true)}>
+                  <Download className="h-4 w-4" /> Cập nhật
                 </GlassButton>
                 <GlassButton variant="ghost" onClick={() => void openReleasePage(update)}>
                   Xem trên GitHub
@@ -158,6 +156,23 @@ export function FirmwareCard(): React.JSX.Element {
           )}
         </div>
       </div>
+      {update?.available ? (
+        <SlideUpConfirmModal
+          open={confirmOpen}
+          title={`Bạn có muốn cập nhật lên v${update.latestVersion} không?`}
+          confirmLabel="Xác nhận"
+          onConfirm={() => {
+            setConfirmOpen(false);
+            void openUpdateSetup(update);
+          }}
+          onCancel={() => setConfirmOpen(false)}
+        >
+          <p>
+            Phiên bản hiện tại (v{update.currentVersion}) sẽ được gỡ và thay bằng v{update.latestVersion} — bản
+            chỉnh sửa, vá lỗi, tính năng mới.
+          </p>
+        </SlideUpConfirmModal>
+      ) : undefined}
     </div>
   );
 }
@@ -172,11 +187,6 @@ export function RestoreCard(): React.JSX.Element {
         <p className="text-sm leading-relaxed text-[#a2a2b0]">
           Ghi cấu hình + phím mặc định của app gốc.
         </p>
-        <div className="mt-3 space-y-1 font-mono text-[13px] text-[#c9c9d6]">
-          <div>DPI: 800 / 1600 / 2400 / 3200 / 6400 / 12000 · nấc 2 (1600)</div>
-          <div>Polling index 3 · Ngủ 10 phút · Lăn thường · Line correction OFF</div>
-          <div>Phím: Trái / Phải / Giữa / Lùi / Tiến / DPI</div>
-        </div>
         <div className="mt-4">
           <GlassButton variant="danger" onClick={() => setConfirmRestore(true)} disabled={!config || busy}>
             <RotateCcw className="h-4 w-4" /> Khôi phục mặc định
