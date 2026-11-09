@@ -21,12 +21,13 @@
  * forces a fresh check (retry button).
  */
 import { getVersion } from '@tauri-apps/api/app';
+import { invoke } from '@tauri-apps/api/core';
 import { openUrl } from '@tauri-apps/plugin-opener';
 
 export const APP_REPO = 'duyzoz/Smail-Wolf-M3-Pro';
 const LATEST_RELEASE_API = `https://api.github.com/repos/${APP_REPO}/releases/latest`;
 /** Fallback when getVersion() is unavailable (plain browser / dev). Bump with releases. */
-export const FALLBACK_APP_VERSION = '3.0.5';
+export const FALLBACK_APP_VERSION = '3.0.6';
 
 export interface AppUpdateInfo {
   available: boolean;
@@ -158,7 +159,27 @@ async function doCheck(): Promise<AppUpdateInfo | null> {
   }
 }
 
-/** Open the setup installer download (falls back to the release page). */
+/** File name of the setup asset, e.g. SMAILWOLF-M3-Pro-Driver_3.0.5_x64-setup.exe.
+ *  Falls back to the conventional name when the URL has no usable basename. */
+export function setupFileName(info: AppUpdateInfo): string {
+  const fromUrl = info.setupUrl?.split('/').pop();
+  if (fromUrl && fromUrl.endsWith('.exe')) return fromUrl;
+  return `SMAILWOLF-M3-Pro-Driver_${info.latestVersion}_x64-setup.exe`;
+}
+
+/** Real self-update (v3.0.6): download the newest .setup to %TEMP%,
+ *  launch the installer, then quit this process entirely. Runs the Rust
+ *  command `install_update` — no browser involved. On success the app
+ *  exits, so this promise never resolves; on failure it rejects with a
+ *  human-readable Vietnamese message. */
+export async function installUpdate(info: AppUpdateInfo): Promise<void> {
+  const url = info.setupUrl ?? info.releaseUrl;
+  await invoke('install_update', { url, filename: setupFileName(info) });
+}
+
+/** Open the setup installer download (falls back to the release page).
+ *  Kept as the fallback for "Mở trên GitHub" — the primary update path
+ *  is installUpdate() above, which does not depend on the browser. */
 export async function openUpdateSetup(info: AppUpdateInfo): Promise<void> {
   const url = info.setupUrl ?? info.releaseUrl;
   try {
