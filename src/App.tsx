@@ -23,12 +23,12 @@ import DevicePicker from './components/DevicePicker';
 import LoadingScreen from './components/LoadingScreen';
 import { CursorBlob } from './components/CursorBlob';
 import { ThemeSwitchDefs } from './components/ThemeToggle';
-import { Marquee, Toasts, ConfirmModal } from './components/ui';
+import { Marquee, Toasts, SlideUpConfirmModal } from './components/ui';
 import { pollingHz } from './lib/hid';
 import {
   checkAppUpdate,
   openUpdateSetup,
-  formatReleaseTime,
+  formatReleaseTimeWithWeekday,
   type AppUpdateInfo,
 } from './lib/updater';
 
@@ -199,19 +199,24 @@ function Root(): React.JSX.Element {
   );
 }
 
-// v3.0.2 — popup báo bản cập nhật mới (lấy từ release mới nhất của repo).
-// Chỉ hiện 1 lần mỗi tag: bấm "Để sau" thì nhớ, không hiện lại tag đó nữa
-// (mở tab Khác vẫn thấy banner trong thẻ Firmware). Đợi loading 3s xong
-// mới hiện để không đè lên màn loading.
+// v3.0.4 — popup báo bản cập nhật mới: TOAST góc phải trên (khung bo tròn),
+// KHÔNG còn modal giữa màn hình. Hiện mỗi lần mở app mà ping GitHub thấy
+// bản mới hơn (bấm "Để sau" chỉ tắt trong phiên này — lần mở sau vẫn hiện
+// lại nếu chưa cập nhật). Đợi loading 3s xong mới hiện để không đè lên
+// màn loading. Bấm "Cập nhật" -> hộp xác nhận trượt lên ở giữa màn hình.
+//
+// v3.0.2 KHÔNG BAO GIỜ báo: fetch api.github.com bị CSP của app chặn
+// (connect-src không có api.github.com) nên check luôn fail im lặng.
+// Đã sửa ở tauri.conf.json — xem ghi chú ở src/lib/updater.ts.
 function AppUpdateGate(): React.JSX.Element | null {
   const { loading } = useMouse();
   const [info, setInfo] = useState<AppUpdateInfo | null>(null);
-  const [open, setOpen] = useState(false);
+  const [toastOpen, setToastOpen] = useState(false);
+  const [confirmOpen, setConfirmOpen] = useState(false);
   useEffect(() => {
     let alive = true;
     void checkAppUpdate().then((res) => {
       if (!alive || !res?.available) return;
-      if (localStorage.getItem(`update-dismissed-${res.latestTag}`) === '1') return;
       setInfo(res);
     });
     return () => {
@@ -219,32 +224,62 @@ function AppUpdateGate(): React.JSX.Element | null {
     };
   }, []);
   useEffect(() => {
-    if (info && !loading) setOpen(true);
+    if (info && !loading) setToastOpen(true);
   }, [info, loading]);
   if (!info) return null;
-  const dismiss = (): void => {
-    localStorage.setItem(`update-dismissed-${info.latestTag}`, '1');
-    setOpen(false);
-  };
   return (
-    <ConfirmModal
-      open={open}
-      title={`Đã có bản cập nhật mới v${info.latestVersion}`}
-      confirmLabel="Tải bản cài đặt"
-      onConfirm={() => {
-        dismiss();
-        void openUpdateSetup(info);
-      }}
-      onCancel={dismiss}
-    >
-      <p>
-        Phát hành: {formatReleaseTime(info.publishedAt)} · Bạn đang dùng v{info.currentVersion}.
-      </p>
-      {info.notes.trim() !== '' && (
-        <div className="mt-2 max-h-40 overflow-y-auto whitespace-pre-line rounded-lg bg-black/20 p-3">
-          {info.notes.trim()}
+    <>
+      {toastOpen && (
+        <div
+          data-testid="update-toast"
+          role="status"
+          className="fixed top-4 right-4 z-50 w-[340px] rounded-2xl border border-orange-400/40 bg-[#17172b]/95 p-4 shadow-2xl shadow-black/50 backdrop-blur-md"
+        >
+          <div className="text-[15px] leading-snug font-bold text-white">
+            Đã có bản cập nhật mới v{info.latestVersion}
+          </div>
+          <p className="mt-1 text-[13px] leading-relaxed text-white/65">
+            Phát hành {formatReleaseTimeWithWeekday(info.publishedAt)}
+          </p>
+          <div className="mt-3 flex gap-2">
+            <button
+              type="button"
+              onClick={() => setConfirmOpen(true)}
+              className="min-h-[44px] flex-1 rounded-xl bg-[#ea580c] px-3 text-sm font-bold text-white transition hover:bg-[#c2410c]"
+            >
+              Cập nhật
+            </button>
+            <button
+              type="button"
+              onClick={() => setToastOpen(false)}
+              className="min-h-[44px] rounded-xl border border-white/15 bg-white/5 px-4 text-sm font-semibold text-white/85 transition hover:bg-white/10"
+            >
+              Để sau
+            </button>
+          </div>
         </div>
       )}
-    </ConfirmModal>
+      <SlideUpConfirmModal
+        open={confirmOpen}
+        title={`Bạn có muốn cập nhật lên v${info.latestVersion} không?`}
+        confirmLabel="Xác nhận"
+        onConfirm={() => {
+          setConfirmOpen(false);
+          setToastOpen(false);
+          void openUpdateSetup(info);
+        }}
+        onCancel={() => setConfirmOpen(false)}
+      >
+        <p>
+          Phiên bản hiện tại (v{info.currentVersion}) sẽ được gỡ và thay bằng v{info.latestVersion} — bản
+          chỉnh sửa, vá lỗi, tính năng mới.
+        </p>
+        {info.notes.trim() !== '' && (
+          <div className="mt-2 max-h-40 overflow-y-auto rounded-lg bg-black/20 p-3 whitespace-pre-line">
+            {info.notes.trim()}
+          </div>
+        )}
+      </SlideUpConfirmModal>
+    </>
   );
 }
