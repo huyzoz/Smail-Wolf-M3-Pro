@@ -29,7 +29,7 @@ import { CardTitle, ConfirmModal, EmptyState, FieldLabel, GlassButton, GlassCard
 
 /** v3.1 — Pin (mô phỏng) + khởi động cùng Windows. Đặt ở tab Khác. */
 export function BatteryCard(): React.JSX.Element {
-  const { connected, busy, simSaver, setBatterySaver } = useMouse();
+  const { connected, busy, simSaver, setBatterySaver, lite, toggleLite } = useMouse();
   const [autostart, setAutostart] = useState<boolean | null>(null);
   const webMode = !isTauri();
 
@@ -53,6 +53,13 @@ export function BatteryCard(): React.JSX.Element {
           onChange={(v) => void setBatterySaver(v)}
           label="Tiết kiệm pin"
         />
+        <div className="border-t border-white/10 pt-3">
+          <Toggle checked={lite} onChange={() => toggleLite()} label="Chế độ nhẹ (máy yếu)" />
+          <p className="mt-2 text-xs leading-relaxed text-[#a2a2b0]">
+            Tắt hết hiệu ứng blur nền (blob đỏ, toast, khung modal) để nhẹ GPU — chỉ đổi giao diện, chuột
+            không đổi gì. Bật lên nếu máy bro vẫn lag.
+          </p>
+        </div>
         <div className="border-t border-white/10 pt-3">
           <Toggle
             checked={autostart ?? false}
