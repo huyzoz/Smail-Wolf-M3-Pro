@@ -391,7 +391,7 @@ export function SkinPopup({ open, onClose }: { open: boolean; onClose: () => voi
             </div>
           </div>
           {!loaded && (
-            <div className="absolute inset-0 z-10 flex items-center justify-center backdrop-blur-md" role="status" aria-label="Đang tải skin">
+            <div className="skin-loading-veil absolute inset-0 z-10 flex items-center justify-center backdrop-blur-md" role="status" aria-label="Đang tải skin">
               <div className="rounded-3xl bg-[var(--surface-solid)] px-6 shadow-xl">
                 <CompassLoader done={done} total={SKINS.length} />
               </div>
