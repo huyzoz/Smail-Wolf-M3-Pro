@@ -13,6 +13,14 @@
  *   500 Hz → 8 mA, 1000 Hz → 14 mA.
  * - Runtime = 400 / current: 133.3 h / 80 h / 50 h / 28.6 h.
  * - Charging (wired, VID 43172): see CHARGE_MA assumption below.
+ * - Sleep-aware elapsed drain (v3.0.7, 2026-11-12): the mouse sleeps
+ *   after `sleep_light` minutes of no input (Ethan's live setting: 5),
+ *   so time the app was closed drains at full rate only for the first
+ *   `sleepMinutes`, then at SLEEP_MA. Before this fix the model drained
+ *   a full 14 mA x 8 h overnight while the real mouse slept at microamps.
+ *   The 1 s tick while the app RUNS still drains at full rate (the app
+ *   cannot see global mouse idleness) — the drain test calibrates the
+ *   absolute scale, which absorbs average idle.
  *
  * Persistence: state lives under key "battery-state-v1" (see tauri.ts).
  * The % is NEVER reset to 100% or 0% on restart/reboot — on load, the
@@ -44,6 +52,12 @@ export const DRAIN_MA: Record<number, number> = {
  * If Ethan ever measures a real charge time, update this one constant.
  */
 export const CHARGE_MA = 150;
+/**
+ * Sleep draw (mA) while the mouse sleeps after `sleep_light` minutes idle.
+ * Assumption (not measured): ~50 µA — FR2012 sleep current is tens of µA,
+ * and the exact value barely matters (8 h asleep = 0.4 mAh = 0.1%).
+ */
+export const SLEEP_MA = 0.05;
 /** % at/below which the low-battery notification fires (once per cycle). */
 export const LOW_PCT = 20;
 /** % above which the low-battery flag resets (hysteresis, avoids flapping). */
@@ -149,18 +163,34 @@ export function chargeTick(state: BatteryState, seconds: number): BatteryState {
  *   while it was closed; it only knows the mouse was wired when it last
  *   ran. If the cable was unplugged, the % will read high until the next
  *   drain catches up — the "ước tính" label is there for exactly this.
- * - discharging → drain the elapsed seconds at `last_polling_rate`.
+ * - discharging → sleep-aware drain: the mouse sleeps after `sleepMinutes`
+ *   of no input, so only the first `sleepMinutes` drain at
+ *   `last_polling_rate`; the rest drains at SLEEP_MA. `sleepMinutes` <= 0
+ *   means Never (sleep_light 0) → full-rate drain the whole time.
+ *   Default 5 = Ethan's live sleep_light setting (2026-11-07); callers
+ *   pass the real setting when the mouse config is already loaded.
  * The result is NEVER reset to 100% or 0%: a saved 80% stays ~80%
  * (minus/plus only the elapsed-time change).
  */
 export function loadWithElapsed(
   saved: BatteryState,
   nowSeconds: number,
+  sleepMinutes = 5,
 ): BatteryState {
   const elapsed = Math.max(0, nowSeconds - saved.updated_at);
   if (elapsed === 0) return { ...saved };
   if (saved.charging) return chargeTick(saved, elapsed);
-  return tick(saved, elapsed, saved.last_polling_rate);
+  if (sleepMinutes <= 0) return tick(saved, elapsed, saved.last_polling_rate);
+  const awakeSeconds = Math.min(elapsed, sleepMinutes * 60);
+  const afterAwake = tick(saved, awakeSeconds, saved.last_polling_rate);
+  const sleepSeconds = elapsed - awakeSeconds;
+  if (sleepSeconds <= 0) return afterAwake;
+  const sleepDrain = (SLEEP_MA * sleepSeconds) / 3600;
+  return {
+    ...afterAwake,
+    remaining_mah: clampMah(afterAwake.remaining_mah - sleepDrain),
+    updated_at: afterAwake.updated_at + sleepSeconds,
+  };
 }
 
 /**
