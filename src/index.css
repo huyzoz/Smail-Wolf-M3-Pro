@@ -1040,8 +1040,11 @@ html[data-theme="dark"] .uiv-btn-ghost:hover:not(:disabled) {
     radial-gradient(circle at 50% 50%, rgba(255, 64, 32, 0.5), rgba(255, 32, 16, 0.16) 58%, rgba(255, 32, 16, 0) 72%);
   border: 1px solid rgba(255, 255, 255, 0.4);
   box-shadow: 0 0 14px rgba(255, 64, 32, 0.28), inset 0 0 10px rgba(255, 255, 255, 0.18);
-  backdrop-filter: blur(6px) saturate(1.4);
-  -webkit-backdrop-filter: blur(6px) saturate(1.4);
+  /* W4 (v3.0.8): blur 6px + saturate -> 4px, không saturate — blob di
+     chuyển liên tục nên mỗi px blur/saturate đều tính lại theo từng frame;
+     4px giữ nguyên vẻ kính lỏng mà rẻ hơn rõ trên GPU yếu. */
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
   will-change: transform, opacity;
 }
 @media (prefers-reduced-motion: reduce) {
@@ -1780,4 +1783,24 @@ html[data-theme="dark"] .uiv-btn-ghost:hover:not(:disabled) {
     linear-gradient(90deg, var(--grid-line) 1px, transparent 1px);
   background-size: 56px 56px;
   transition: background-color 0.5s ease;
+}
+
+/* ---------- W4 (v3.0.8): Chế độ nhẹ — html.lite ----------
+   Tắt hết blur nền để nhẹ GPU máy yếu. Các lớp phủ đều có nền mờ đặc
+   sẵn (bg-black/60, bg-[#17172b]/95, bg-[#0b0b26]/85) nên bỏ blur vẫn
+   đọc được; chỉ veil tải skin là trong suốt nên cho nền đặc riêng.
+   Blob đỏ vẫn đuổi chuột (gradient + shadow rẻ), chỉ mất lớp kính.
+   KHÔNG đụng gì tới chuột — thuần giao diện. */
+html.lite .backdrop-blur-sm,
+html.lite .backdrop-blur-md,
+html.lite .cursor-blob {
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+html.lite .uiv-blob-btn .uiv-blob-svg {
+  animation: none !important;
+  opacity: 0 !important;
+}
+html.lite .skin-loading-veil {
+  background: var(--surface-solid);
 }

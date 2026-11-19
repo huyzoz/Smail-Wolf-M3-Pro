@@ -79,6 +79,10 @@ interface MouseStore {
   /** v3.0: theme sáng/tối toàn app (Uiverse toggle ở TopBar). */
   theme: AppTheme;
   toggleTheme: () => void;
+  /** W4 (v3.0.8): Chế độ nhẹ — tắt hết blur nền (blob, toast, modal) cho
+      máy yếu; chỉ đổi giao diện, không đụng gì tới chuột. */
+  lite: boolean;
+  toggleLite: () => void;
   busy: boolean;
   wired: boolean;
   deviceLabel: string;
@@ -170,6 +174,26 @@ export function MouseProvider({ children }: { children: ReactNode }): React.JSX.
       /* storage khóa — theme vẫn đổi trong phiên */
     }
   }, [theme]);
+  // W4 (v3.0.8): Chế độ nhẹ — mặc định TẮT, nhớ lựa chọn vào localStorage.
+  // Áp class `lite` lên <html> để CSS tắt blur nền (xem cuối index.css).
+  const [lite, setLite] = useState<boolean>(() => {
+    try {
+      return localStorage.getItem('smailwolf_m3pro_lite_v1') === '1';
+    } catch {
+      return false;
+    }
+  });
+  const toggleLite = useCallback(() => {
+    setLite((v) => !v);
+  }, []);
+  useEffect(() => {
+    document.documentElement.classList.toggle('lite', lite);
+    try {
+      localStorage.setItem('smailwolf_m3pro_lite_v1', lite ? '1' : '0');
+    } catch {
+      /* storage khóa — lite vẫn đổi trong phiên */
+    }
+  }, [lite]);
   const [busy, setBusy] = useState(false);
   const [wired, setWired] = useState(false);
   const [deviceLabel, setDeviceLabel] = useState('chưa kết nối');
@@ -751,7 +775,7 @@ export function MouseProvider({ children }: { children: ReactNode }): React.JSX.
   // "Dùng thử Demo (mô phỏng)" hoặc "Kết nối chuột thật (WebHID)".
   const value = useMemo<MouseStore>(
     () => ({
-      mode, connected, connecting, loading, theme, toggleTheme, busy, wired, deviceLabel, version, mouseName,
+      mode, connected, connecting, loading, theme, toggleTheme, lite, toggleLite, busy, wired, deviceLabel, version, mouseName,
       battery, chargeFlag, batteryHistory, lastBatteryRead, batteryReads,
       simPct, simPctPrecise, simCharging, simSaver, simRemainingMah, simPollingHz, setBatterySaver,
       config, keys, configRaw, keysRaw, toasts,
@@ -761,7 +785,7 @@ export function MouseProvider({ children }: { children: ReactNode }): React.JSX.
       deleteProfile, restoreFactory, simulateDpiPush, listenDpiPush, addLog, dismissToast,
     }),
     [
-      mode, connected, connecting, loading, theme, toggleTheme, busy, wired, deviceLabel, version, mouseName,
+      mode, connected, connecting, loading, theme, toggleTheme, lite, toggleLite, busy, wired, deviceLabel, version, mouseName,
       battery, chargeFlag, batteryHistory, lastBatteryRead, batteryReads,
       simPct, simPctPrecise, simCharging, simSaver, simRemainingMah, simPollingHz, setBatterySaver,
       config, keys, configRaw, keysRaw, toasts,
