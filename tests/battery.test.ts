@@ -16,6 +16,7 @@ import {
   rateHz,
   runtimeHours,
   shouldNotifyLow,
+  SLEEP_MA,
   tick,
   USABLE_MAH,
   type BatteryState,
@@ -77,10 +78,34 @@ eq('charge caps at 400 mAh', chargeTick({ ...full(), remaining_mah: 390 }, 3600)
 approx('charge 0→400 takes ~2.67 h', 400 / 150, 2.6667);
 
 // --- loadWithElapsed: elapsed time while closed, NEVER reset to 100/0 ---
+// Sleep-aware (v3.0.7): the mouse sleeps after `sleepMinutes` idle, so a
+// 3600 s closure at 500 Hz drains only 300 s at 8 mA + 3300 s at SLEEP_MA:
+// 320 - (8*300/3600) - (0.05*3300/3600) = 319.2875.
+eq('sleep draw is 0.05 mA', SLEEP_MA, 0.05);
 approx(
-  'closed 3600 s at 500 Hz drains 8 mAh',
+  'closed 3600 s at 500 Hz, sleep 5 min: drains ~0.71 mAh (not 8)',
   loadWithElapsed({ ...full(500), remaining_mah: 320 }, now + 3600).remaining_mah,
+  319.29,
+);
+approx(
+  'closed 3600 s at 500 Hz, sleep Never (0): drains full 8 mAh',
+  loadWithElapsed({ ...full(500), remaining_mah: 320 }, now + 3600, 0).remaining_mah,
   312,
+);
+approx(
+  'closed 3600 s at 1000 Hz, sleep 60 min: full hour awake, drains 14 mAh',
+  loadWithElapsed({ ...full(1000), remaining_mah: 400 }, now + 3600, 60).remaining_mah,
+  386,
+);
+approx(
+  'closed exactly the 5 min sleep window at 1000 Hz: drains 1.17 mAh',
+  loadWithElapsed({ ...full(1000), remaining_mah: 400 }, now + 300).remaining_mah,
+  398.83,
+);
+eq(
+  'sleep-aware load still advances updated_at by the full elapsed time',
+  loadWithElapsed({ ...full(500), remaining_mah: 320 }, now + 3600).updated_at,
+  now + 3600,
 );
 eq(
   'saved 80% stays ~80% on load (no reset to 100)',
