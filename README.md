@@ -263,6 +263,50 @@ tests/
 
 ## Changelog
 
+## v3.0.11 — connection sweep, per-section colours, Firmware last (2026-11-20)
+
+Ethan's order from his v3.0.9 screenshot, in one release:
+
+1. **Connection cluster, alive** — every ~24s the mode pill runs a Color
+   Bar Sweep: three trailing bars (violet `#7C3AED` → rose `#F43F5E` →
+   orange `#EA580C`, the ui-ux-pro-max gaming palette) glide across and
+   cover all three mode icons, then the three modes appear as text —
+   "2.4GHz · Ethernet · Bluetooth" — fading in from blur to sharp, the
+   active one lit up. Then the band sweeps back the other way and the
+   icons return. Transform/opacity only, never blocks a click, static
+   under `prefers-reduced-motion`.
+2. **More tab, one colour per section** — no longer all the same blue:
+   Battery sky, Firmware brand orange, Profiles violet, Settings emerald,
+   Restore rose, Raw slate. Same glass look, just a different hue.
+3. **Firmware moves to the bottom** of the More tab — but the update
+   check still fires the moment the app opens (AppUpdateGate, cached
+   promise), so the "a new update is available" toast shows just as fast.
+4. **"View source" never fails silently again** — if the system browser
+   won't open, the app now shows an error toast carrying the real reason
+   and the link, instead of doing nothing. Same for "View on GitHub" and
+   the update modal's "Open on GitHub".
+
+Verified in the sandbox: tsc clean, 154/154 tests, sweep probe 5/5
+(band covers all 3 icons, 3 labels with the active one highlighted,
+reverse sweep returns the icons), reduced-motion probe 3/3 (no sweep,
+View-source toast with URL), More-tab probe 20/20 (order, tones,
+instant update toast, modal, persistence), screenshots light + dark.
+
+## v3.0.10 — framer-motion removed (2026-11-20)
+
+Wave 6 of the client overhaul: the animation library is gone — it was
+~141 kB of the JavaScript bundle and did nothing the browser can't do
+natively. **Bundle 520,208 B → 382,238 B (−26.5%).** Every animation it
+ran is now native: modal/popup entrances are CSS keyframes, toasts and
+the loading screen fade out with a short CSS transition, card hover is a
+plain CSS lift, and the key-assign popup still flies into the mouse
+button — now via the Web Animations API — and only writes the key when
+the flight finishes, exactly like before. `prefers-reduced-motion` is
+respected. No behaviour changed; the animations look the same, they just
+cost less. Steady-state longtask cost is unchanged from v3.0.9 (same
+ballpark run to run) — this wave's win is bundle size, not runtime
+speed; the real-machine verdict is still Ethan's.
+
 ## v3.0.9 — full-English redesign + silent updater (2026-11-20)
 
 The whole app and this README are now **English only, no Vietnamese**.
