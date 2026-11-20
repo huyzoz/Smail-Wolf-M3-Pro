@@ -12,7 +12,6 @@
  * theme change (no instant switch).
  */
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
-import { AnimatePresence } from 'framer-motion';
 import { Battery, Cpu, Gauge, Radio } from 'lucide-react';
 import { listen } from '@tauri-apps/api/event';
 import { MouseProvider, useMouse } from './store';
@@ -191,13 +190,31 @@ function Root(): React.JSX.Element {
     }
     setSweepKey((k) => k + 1);
   }, [theme]);
+  // W6: was AnimatePresence + framer exit (0.3s fade). Now: when `loading`
+  // ends, keep the screen mounted 300ms with the fading class, then unmount.
+  // If loading starts again mid-fade, the cleanup cancels the timeout.
+  const [loadingVisible, setLoadingVisible] = useState(false);
+  const [loadingFading, setLoadingFading] = useState(false);
+  useEffect(() => {
+    if (loading) {
+      setLoadingVisible(true);
+      setLoadingFading(false);
+      return;
+    }
+    setLoadingFading(true);
+    const t = window.setTimeout(() => {
+      setLoadingVisible(false);
+      setLoadingFading(false);
+    }, 300);
+    return () => window.clearTimeout(t);
+  }, [loading]);
   return (
     <>
       <ThemeSwitchDefs />
       <CursorBlob />
       {sweepKey > 0 && <div key={sweepKey} className="theme-sweep-band" aria-hidden="true" />}
       {!connected ? <DevicePicker /> : <Shell />}
-      <AnimatePresence>{loading && <LoadingScreen />}</AnimatePresence>
+      {loadingVisible && <LoadingScreen fading={loadingFading} />}
       <Toasts />
       <AppUpdateGate />
     </>

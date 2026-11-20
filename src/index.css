@@ -938,14 +938,133 @@ body {
   .app-enter,
   .tab-enter,
   .part-glow.on,
-  .device-stars-twinkle {
+  .device-stars-twinkle,
+  .w6-modal-in,
+  .w6-fade-up,
+  .w6-pop-in,
+  .w6-toast-in,
+  .w6-assign-in,
+  .w6-loading-in {
     animation: none !important;
   }
   .uiv-btn,
   .dock,
-  .uiv-shy-btn {
-    transition: none;
+  .uiv-shy-btn,
+  .panel-card[data-hover],
+  .toast-exiting,
+  .loading-fading {
+    /* !important: the W6 rules below re-declare transitions on these classes
+       and come later in the file — without it they would win over this block. */
+    transition: none !important;
   }
+}
+
+/* ---------- W6: framer-motion replacements (CSS keyframes + WAAPI) ---------- */
+/* framer-motion is gone (v3.0.10). Every motion.div / AnimatePresence it ran is
+   replaced below: enter-only animations are pure CSS keyframes on mount, exit
+   animations use an `exiting`/`fading` class + a short timeout in the component,
+   and the key-assign fly uses the Web Animations API (AssignPopup.tsx). All
+   keyframes are transform/opacity only (GPU-cheap) and are disabled above under
+   prefers-reduced-motion. */
+@keyframes w6-modal-in {
+  from {
+    opacity: 0;
+    transform: scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+@keyframes w6-fade-up {
+  from {
+    opacity: 0;
+    transform: translateY(24px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+@keyframes w6-pop-in {
+  from {
+    opacity: 0;
+    transform: scale(0.96) translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+@keyframes w6-toast-in {
+  from {
+    opacity: 0;
+    transform: translateY(-12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+@keyframes w6-assign-in {
+  from {
+    opacity: 0;
+    transform: scale(0.92) translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+@keyframes w6-loading-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+.w6-modal-in {
+  animation: w6-modal-in 0.25s ease-out;
+}
+.w6-fade-up {
+  animation: w6-fade-up 0.22s ease-out;
+}
+.w6-pop-in {
+  animation: w6-pop-in 0.25s ease-out;
+}
+.w6-toast-in {
+  animation: w6-toast-in 0.25s ease-out;
+}
+.w6-assign-in {
+  animation: w6-assign-in 0.25s ease-out;
+}
+.w6-loading-in {
+  animation: w6-loading-in 0.3s ease-out;
+}
+/* GlassCard hover lift (was framer whileHover spring 300/22, only when the
+   `hover` prop is true — the data-hover attribute carries it). */
+.panel-card[data-hover] {
+  transition: translate 0.18s ease-out;
+}
+.panel-card[data-hover]:hover {
+  translate: 0 -4px;
+}
+/* Toast exit (was framer exit opacity 0, y -12, 0.25s): the store marks the
+   toast `exiting`, this class fades it out, and the toast is removed after
+   250ms. */
+.toast-exiting {
+  opacity: 0 !important;
+  transform: translateY(-12px);
+  transition:
+    opacity 0.25s ease-out,
+    transform 0.25s ease-out;
+}
+/* Loading screen exit (was framer exit opacity 0, 0.3s): App keeps the screen
+   mounted 300ms after `loading` ends with this class, then unmounts it. */
+.loading-fading {
+  opacity: 0;
+  transition: opacity 0.3s ease;
 }
 
 /* ============================================================

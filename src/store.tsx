@@ -67,6 +67,8 @@ export interface Toast {
   id: number;
   kind: 'ok' | 'err' | 'info';
   text: string;
+  /** W6: true while the toast is fading out (250ms) before removal. */
+  exiting?: boolean;
 }
 
 const ts = (): string => new Date().toLocaleTimeString('en-GB');
@@ -297,17 +299,28 @@ export function MouseProvider({ children }: { children: ReactNode }): React.JSX.
   const addLog = useCallback((text: string) => {
     const id = ++toastId.current;
     setToasts((prev) => [...prev.slice(-2), { id, kind: 'info', text }]);
-    setTimeout(() => setToasts((prev) => prev.filter((t) => t.id !== id)), 4500);
+    // W6: exit is two steps — mark `exiting` (CSS fades it out over 250ms),
+    // then remove it. Was a single filter at 4500ms (framer exit).
+    setTimeout(() => {
+      setToasts((prev) => prev.map((t) => (t.id === id ? { ...t, exiting: true } : t)));
+      setTimeout(() => setToasts((prev) => prev.filter((t) => t.id !== id)), 250);
+    }, 4500);
   }, []);
 
   const pushToast = useCallback((kind: Toast['kind'], text: string) => {
     const id = ++toastId.current;
     setToasts((prev) => [...prev, { id, kind, text }]);
-    setTimeout(() => setToasts((prev) => prev.filter((t) => t.id !== id)), 4500);
+    // W6: two-step exit, same as addLog above.
+    setTimeout(() => {
+      setToasts((prev) => prev.map((t) => (t.id === id ? { ...t, exiting: true } : t)));
+      setTimeout(() => setToasts((prev) => prev.filter((t) => t.id !== id)), 250);
+    }, 4500);
   }, []);
 
   const dismissToast = useCallback((id: number) => {
-    setToasts((prev) => prev.filter((t) => t.id !== id));
+    // W6: two-step exit — mark, fade 250ms, then remove.
+    setToasts((prev) => prev.map((t) => (t.id === id ? { ...t, exiting: true } : t)));
+    setTimeout(() => setToasts((prev) => prev.filter((t) => t.id !== id)), 250);
   }, []);
 
   const applyFullRead = useCallback((r: FullRead, isWired: boolean) => {
