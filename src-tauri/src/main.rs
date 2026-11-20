@@ -15,7 +15,7 @@ mod store;
 
 use std::sync::Mutex;
 use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent};
-use tauri::{LogicalSize, Manager, PhysicalPosition, Position, Size, WindowEvent};
+use tauri::{Emitter, LogicalSize, Manager, PhysicalPosition, Position, Size, WindowEvent};
 use tauri_plugin_autostart::ManagerExt;
 use tauri_plugin_notification::NotificationExt;
 
