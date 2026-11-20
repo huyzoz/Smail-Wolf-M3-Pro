@@ -265,7 +265,9 @@ tests/
 
 ## v3.0.12 — timer audit: one toast exit, sweep pauses when hidden (2026-11-20)
 
-Wave 9 of the 19-wave overhaul — a full audit of every timer in the app:
+Wave 9 of the 19-wave overhaul — a full audit of every timer in the app,
+plus a sweep fix from Ethan's live verdict on v3.0.11 ("xấu", the pill
+widened, three labels):
 
 1. **One toast exit** — `addLog` and `pushToast` each carried an identical
    nested timeout pair (4.5s → mark exiting → 250ms → remove), and manual
@@ -281,10 +283,21 @@ Wave 9 of the 19-wave overhaul — a full audit of every timer in the app:
    hidden: the tray popup reads the live battery from them, so stopping
    them would make the tray go stale. The tick's state updates were
    already gated (W5), so its cost while hidden is negligible.
+4. **Sweep fixed: one label, frozen frame, 10s chase** — the v3.0.11
+   sweep widened the pill (the 3-label row was wider than the icons) and
+   showed all three mode names. Now it cycles every 10s, the three bars
+   chase each other at constant speed (staggered 0/150/300ms, each 75%
+   of the pill), only the active mode shows as one label (blur → sharp),
+   and the pill never moves or resizes — the icons stay in flow through
+   every phase, the band and label are overlays. (Also fixed while
+   here: the cycle timer passed the period as the next start offset, so
+   the first repeat landed a full cycle late.)
 
 Verified in the sandbox: tsc clean, 154/154 tests, new hidden-gating
 probe 5/5 (no sweep while hidden, resumes on show, mid-sweep hide
-resets to idle), sweep probe 5/5, W6 probe 13/13, DPI e2e 13/13.
+resets to idle), sweep probe 7/7 (chase covers all 3 icons, exactly 1
+label, pill rect identical in every phase, second cycle ~10s after the
+first), W6 probe 13/13, DPI e2e 13/13, reduced-motion probe 3/3.
 
 ## v3.0.11 — connection sweep, per-section colours, Firmware last (2026-11-20)
 
