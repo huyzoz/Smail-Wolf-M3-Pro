@@ -23,12 +23,16 @@ import { FALLBACK_APP_VERSION, currentAppVersion } from '../lib/updater';
 export function TopBar(): React.JSX.Element {
   const { mode, connected, busy, wired, deviceLabel, disconnect, refresh, theme } = useMouse();
   const [confirmDisconnect, setConfirmDisconnect] = useState(false);
-  // v3.0.11 — Color Bar Sweep (Ethan): every ~24s the mode pill runs a
-  // cycle — a 3-bar colour band (violet → rose → orange, ui-ux-pro-max
-  // gaming palette) sweeps L→R over the icons, the 3 modes appear as text
-  // fading in blur → sharp (active highlighted), then the band sweeps back
-  // R→L and the icons return. Transform/opacity only, never blocks input
-  // (pill is display-only), first run ~6s after connect, static under
+  // v3.0.11 — Color Bar Sweep (Ethan), fixed in v3.0.12 after his live
+  // verdict ("xấu", pill widened, 3 labels): cycle every 10s; the band is
+  // now 3 strips CHASING each other (staggered 0/150/300ms, constant
+  // speed, each 75% of the pill) L→R, then ONE text label — the active
+  // mode only — fades in blur → sharp, then the strips chase back R→L
+  // (reverse stagger) and the icons return. The pill NEVER changes size
+  // or position: the icons row stays in flow through every phase (only
+  // its opacity drops), the band + text are absolutely-positioned
+  // overlays. Transform/opacity only, never blocks input (pill is
+  // display-only), first run ~6s after connect, static under
   // reduced-motion. Phase is exposed as data-sweep for the probe.
   type SweepPhase = 'idle' | 'sweep-in' | 'text' | 'sweep-out';
   const [sweep, setSweep] = useState<SweepPhase>('idle');
@@ -39,8 +43,11 @@ export function TopBar(): React.JSX.Element {
     const SWEEP_FIRST_MS = 6000;
     const SWEEP_IN_MS = 900;
     const TEXT_MS = 2200;
-    const SWEEP_OUT_MS = 600;
-    const CYCLE_MS = 24000;
+    // v3.0.12: sweep-out phase is 900ms = 300ms trailing delay + 600ms
+    // travel (the strips chase back with the stagger flipped).
+    const SWEEP_OUT_MS = 900;
+    // v3.0.12: cycle every 10s (Ethan: "hiệu ứng hiện 10s 1 lần").
+    const CYCLE_MS = 10000;
     let cancelled = false;
     let running = false;
     const at = (fn: () => void, ms: number): void => {
@@ -56,17 +63,20 @@ export function TopBar(): React.JSX.Element {
       sweepTimers.current = [];
       setSweep('idle');
     };
-    const cycle = (startIn: number): void => {
-      at(() => setSweep('sweep-in'), startIn);
-      at(() => setSweep('text'), startIn + SWEEP_IN_MS);
-      at(() => setSweep('sweep-out'), startIn + SWEEP_IN_MS + TEXT_MS);
-      at(() => setSweep('idle'), startIn + SWEEP_IN_MS + TEXT_MS + SWEEP_OUT_MS);
-      at(() => cycle(CYCLE_MS), startIn + CYCLE_MS);
+    const cycle = (): void => {
+      // v3.0.12: phases are offsets from THIS cycle's start (the old
+      // shape passed CYCLE_MS as the next startIn, so the first repeat
+      // landed a full cycle late — gap 20s instead of 10s).
+      at(() => setSweep('sweep-in'), 0);
+      at(() => setSweep('text'), SWEEP_IN_MS);
+      at(() => setSweep('sweep-out'), SWEEP_IN_MS + TEXT_MS);
+      at(() => setSweep('idle'), SWEEP_IN_MS + TEXT_MS + SWEEP_OUT_MS);
+      at(() => cycle(), CYCLE_MS);
     };
     const startCycle = (): void => {
       if (running || cancelled) return;
       running = true;
-      cycle(SWEEP_FIRST_MS);
+      at(() => cycle(), SWEEP_FIRST_MS);
     };
     // W9: don't burn cycles while the window is hidden to tray — the band
     // is invisible there and every phase change re-renders the top bar for
@@ -128,29 +138,33 @@ export function TopBar(): React.JSX.Element {
               ready for a future BT path.) Demo keeps a tiny DEMO tag so simulation
               is never mistaken for a real mouse. v3.0.11: the pill runs a Color Bar
               Sweep cycle (see the sweep effect above) — band covers the icons,
-              then the 3 modes show as text, then the band sweeps back. */}
+              then the ONE active mode shows as text, then the band sweeps back.
+              v3.0.12: the pill never moves — the icons row stays in flow in
+              every phase (it only fades), the band + label overlay it. */}
           {connected && (
             <span
               data-sweep={sweep}
               className="relative flex items-center gap-2.5 overflow-hidden rounded-full border border-[rgba(22,22,26,0.16)] bg-white/50 px-3 py-2"
               title={wired ? 'Wired mode' : '2.4GHz mode'}
             >
-              {sweep !== 'text' && (
-                <span className="flex items-center gap-2.5">
-                  <span title="2.4G" className={`conn-icon ${!wired ? 'conn-icon-active' : ''}`}>
-                    <Wifi className="h-4 w-4" />
-                  </span>
-                  <span title="Wired" className={`conn-icon ${wired ? 'conn-icon-active' : ''}`}>
-                    <Cable className="h-4 w-4" />
-                  </span>
-                  <span title="Bluetooth" className="conn-icon">
-                    <Bluetooth className="h-4 w-4" />
-                  </span>
-                  {mode === 'demo' && (
-                    <span className="text-[10px] font-bold tracking-wide text-amber-800">DEMO</span>
-                  )}
+              {/* v3.0.12: the icons row NEVER unmounts — it is the pill's
+                  only in-flow content, so the pill keeps its exact size
+                  and position through every phase; during the sweep/text
+                  it only fades out (opacity), the band + label overlay it. */}
+              <span className={`flex items-center gap-2.5${sweep !== 'idle' ? ' conn-icons-faded' : ''}`}>
+                <span title="2.4G" className={`conn-icon ${!wired ? 'conn-icon-active' : ''}`}>
+                  <Wifi className="h-4 w-4" />
                 </span>
-              )}
+                <span title="Wired" className={`conn-icon ${wired ? 'conn-icon-active' : ''}`}>
+                  <Cable className="h-4 w-4" />
+                </span>
+                <span title="Bluetooth" className="conn-icon">
+                  <Bluetooth className="h-4 w-4" />
+                </span>
+                {mode === 'demo' && (
+                  <span className="text-[10px] font-bold tracking-wide text-amber-800">DEMO</span>
+                )}
+              </span>
               {(sweep === 'sweep-in' || sweep === 'sweep-out') && (
                 <span className={`conn-sweep-band${sweep === 'sweep-out' ? ' conn-sweep-band-out' : ''}`} aria-hidden>
                   <span className="conn-sweep-strip conn-sweep-strip-1" />
@@ -158,20 +172,16 @@ export function TopBar(): React.JSX.Element {
                   <span className="conn-sweep-strip conn-sweep-strip-3" />
                 </span>
               )}
+              {/* v3.0.12: ONE label only — the active mode. (Ethan: the
+                  3-label row widened the pill and read as clutter.) */}
               {sweep === 'text' && (
                 <span className="conn-mode-text">
-                  {(['2.4GHz', 'Ethernet', 'Bluetooth'] as const).map((label) => {
-                    const active = (wired && label === 'Ethernet') || (!wired && label === '2.4GHz');
-                    return (
-                      <span
-                        key={label}
-                        data-mode-label={label}
-                        className={`conn-mode-label${active ? ' conn-mode-active' : ''}`}
-                      >
-                        {label}
-                      </span>
-                    );
-                  })}
+                  <span
+                    data-mode-label={wired ? 'Ethernet' : '2.4GHz'}
+                    className="conn-mode-label conn-mode-active"
+                  >
+                    {wired ? 'Ethernet' : '2.4GHz'}
+                  </span>
                 </span>
               )}
             </span>
