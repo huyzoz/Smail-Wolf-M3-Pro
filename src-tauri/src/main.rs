@@ -39,7 +39,7 @@ const POPUP_MARGIN: i32 = 8;
 const TASKBAR_RESERVE: i32 = 48;
 
 /// Low-battery notification body (exact wording Ethan specified).
-const LOW_BATTERY_BODY: &str = "Chuột của bạn còn 20% pin, vui lòng sạc pin";
+const LOW_BATTERY_BODY: &str = "Your mouse has 20% battery left, please charge it";
 
 /// Fit scale for the primary monitor: the largest scale (<= 1) that fits
 /// the design size inside the monitor's work area (taskbar reserved).
@@ -145,7 +145,7 @@ fn autostart_set(app: tauri::AppHandle, enabled: bool) -> Result<(), String> {
 fn notify_low_battery(app: tauri::AppHandle) -> Result<(), String> {
     app.notification()
         .builder()
-        .title("Pin chuột yếu")
+        .title("Low mouse battery")
         .body(LOW_BATTERY_BODY)
         .show()
         .map_err(|e| format!("notification failed: {e}"))
@@ -155,7 +155,7 @@ fn notify_low_battery(app: tauri::AppHandle) -> Result<(), String> {
 // Tray actions (also callable from the tray popup frontend)
 // ---------------------------------------------------------------------------
 
-/// Show + focus the main window (tray left-click / "Mở giao diện" button).
+/// Show + focus the main window (tray left-click / "Open interface" button).
 #[tauri::command]
 fn tray_show_main(app: tauri::AppHandle) -> Result<(), String> {
     let win = app
@@ -168,63 +168,214 @@ fn tray_show_main(app: tauri::AppHandle) -> Result<(), String> {
     Ok(())
 }
 
-/// Quit the whole app ("Thoát chương trình" button).
+/// Quit the whole app ("Quit app" button).
 #[tauri::command]
 fn tray_quit(app: tauri::AppHandle) {
     app.exit(0);
 }
 
 // ---------------------------------------------------------------------------
-// Self-update (v3.0.6)
+// Self-update (v3.0.9 — silent in-client updater, redesign 2026-11-19 §n)
 // ---------------------------------------------------------------------------
 
-/// Real self-update: download the newest .setup to %TEMP%, launch it,
-/// then quit this process entirely so the installer can replace the
-/// running exe. Uses Windows' built-in curl.exe (Win10 1803+ / Win11)
-/// — no new crates. Sync fn: Tauri runs it on its thread pool, so the
-/// blocking curl download is fine.
-/// On success this function never returns (app.exit ends the process);
-/// the frontend treats "invoke resolved" as "installer is launching".
-/// On failure it returns a human-readable Vietnamese error message.
-#[tauri::command]
-fn install_update(app: tauri::AppHandle, url: String, filename: String) -> Result<(), String> {
-    let tmp_path = std::env::temp_dir().join(&filename);
-    let tmp_str = tmp_path.to_string_lossy().to_string();
-    // 1. Download — -L follows GitHub's redirect to objects.githubusercontent.com.
-    let out = std::process::Command::new("curl.exe")
-        .args([
-            "-L",
-            "--fail",
-            "--silent",
-            "--show-error",
-            "-o",
-            &tmp_str,
-            &url,
-        ])
-        .output()
-        .map_err(|e| format!("Không chạy được curl.exe: {e}"))?;
-    if !out.status.success() {
-        let detail = String::from_utf8_lossy(&out.stderr).trim().to_string();
-        return Err(if detail.is_empty() {
-            "Tải bản cài đặt thất bại (mất mạng?).".to_string()
-        } else {
-            format!("Tải bản cài đặt thất bại: {detail}")
-        });
+/// Progress event payload, emitted as `update-progress` while downloading.
+/// `total` is 0 when the server sent no Content-Length.
+#[derive(Clone, serde::Serialize)]
+struct UpdateProgress {
+    downloaded: u64,
+    total: u64,
+}
+
+/// Result of a finished download: where the installer is cached on disk.
+#[derive(serde::Serialize)]
+struct UpdateDownloaded {
+    path: String,
+    size: u64,
+    cached: bool,
+}
+
+/// Where finished downloads live: %LOCALAPPDATA%\<identifier>\updates\.
+/// Ethan's rule: Close = no update, the file stays cached here.
+fn updates_dir(app: &tauri::AppHandle) -> Result<std::path::PathBuf, String> {
+    let dir = app
+        .path()
+        .app_local_data_dir()
+        .map_err(|e| format!("local data dir unavailable: {e}"))?
+        .join("updates");
+    std::fs::create_dir_all(&dir).map_err(|e| format!("cannot create updates dir: {e}"))?;
+    Ok(dir)
+}
+
+/// A setup is real only if it is at least 1 MB — anything tiny is an error
+/// page that got saved instead of the installer (same guard as v3.0.6).
+const MIN_SETUP_BYTES: u64 = 1_000_000;
+
+/// Delete a file or directory tree, ignoring every individual failure.
+/// The running WebView2 profile holds locks on some files, so a strict
+/// remove_dir_all would stop at the first locked file and leave the rest.
+/// Best effort removes the most it can; the new installer replaces program
+/// files + shortcuts on top.
+fn remove_best_effort(path: &std::path::Path) {
+    if path.is_symlink() || path.is_file() {
+        let _ = std::fs::remove_file(path);
+        return;
     }
-    // 2. Sanity check: the real setup is ~18 MB — anything tiny is an
-    //    error page that got saved instead of the installer.
-    let size = std::fs::metadata(&tmp_path).map(|m| m.len()).unwrap_or(0);
-    if size < 1_000_000 {
+    if path.is_dir() {
+        if let Ok(entries) = std::fs::read_dir(path) {
+            for entry in entries.flatten() {
+                remove_best_effort(&entry.path());
+            }
+        }
+        let _ = std::fs::remove_dir(path);
+    }
+}
+
+/// Silent in-client download (replaces v3.0.6's curl.exe — the CMD window
+/// Ethan saw during updates came from curl). Runs in-process with reqwest's
+/// blocking client, streams the file to the %LOCALAPPDATA% cache in 64 KB
+/// reads, and emits `update-progress` events so the frontend progress bar
+/// moves with the real download. Sync fn: Tauri runs it on its thread pool,
+/// so the blocking download is fine.
+/// If the exact installer file is already cached (same version = same
+/// filename) and passes the size check, it returns immediately without
+/// re-downloading — Close-then-reopen is instant.
+#[tauri::command]
+fn download_update(app: tauri::AppHandle, url: String, filename: String) -> Result<UpdateDownloaded, String> {
+    use std::io::{Read, Write};
+    if filename.contains(['/', '\\']) || filename == ".." || filename.is_empty() {
+        return Err("Invalid installer file name.".to_string());
+    }
+    let dir = updates_dir(&app)?;
+    let dest = dir.join(&filename);
+    if let Ok(meta) = std::fs::metadata(&dest) {
+        if meta.len() >= MIN_SETUP_BYTES {
+            return Ok(UpdateDownloaded {
+                path: dest.to_string_lossy().into_owned(),
+                size: meta.len(),
+                cached: true,
+            });
+        }
+        let _ = std::fs::remove_file(&dest);
+    }
+    let client = reqwest::blocking::Client::builder()
+        .timeout(std::time::Duration::from_secs(900))
+        .build()
+        .map_err(|e| format!("Could not start the download: {e}"))?;
+    let mut resp = client
+        .get(&url)
+        .send()
+        .map_err(|e| format!("Download failed: {e}"))?;
+    if !resp.status().is_success() {
+        return Err(format!("Download failed: the server answered {}.", resp.status()));
+    }
+    let total = resp.content_length().unwrap_or(0);
+    let mut file =
+        std::fs::File::create(&dest).map_err(|e| format!("Could not save the download: {e}"))?;
+    let mut downloaded: u64 = 0;
+    let mut last_emit: u64 = 0;
+    let mut buf = [0u8; 65536];
+    loop {
+        match resp.read(&mut buf) {
+            Ok(0) => break,
+            Ok(n) => {
+                if let Err(e) = file.write_all(&buf[..n]) {
+                    drop(file);
+                    let _ = std::fs::remove_file(&dest);
+                    return Err(format!("Could not save the download: {e}"));
+                }
+                downloaded += n as u64;
+                // Emit at most every 512 KB (or at 100%) so the frontend
+                // isn't flooded with an event per 64 KB read.
+                if downloaded - last_emit >= 512 * 1024 || (total > 0 && downloaded >= total) {
+                    last_emit = downloaded;
+                    let _ = app.emit("update-progress", UpdateProgress { downloaded, total });
+                }
+            }
+            Err(e) => {
+                drop(file);
+                let _ = std::fs::remove_file(&dest);
+                return Err(format!("Download failed: {e}"));
+            }
+        }
+    }
+    drop(file);
+    let _ = app.emit("update-progress", UpdateProgress { downloaded, total });
+    let size = std::fs::metadata(&dest).map(|m| m.len()).unwrap_or(0);
+    if size < MIN_SETUP_BYTES {
+        let _ = std::fs::remove_file(&dest);
         return Err(format!(
-            "File tải về chỉ {size} byte — link có thể đã đổi, thử lại hoặc mở trên GitHub."
+            "Downloaded file is only {size} bytes — the link may have changed, retry or open on GitHub."
         ));
     }
-    // 3. Launch the installer, then quit this process entirely. The NSIS
-    //    wizard shows first; files are only replaced after the user clicks
-    //    Install, so the app is long gone by then.
-    std::process::Command::new(&tmp_path)
-        .spawn()
-        .map_err(|e| format!("Không mở được bộ cài: {e}"))?;
+    // Prune cached installers of OTHER versions so the cache never piles up.
+    if let Ok(entries) = std::fs::read_dir(&dir) {
+        for entry in entries.flatten() {
+            let p = entry.path();
+            if p.is_file()
+                && p != dest
+                && p.file_name()
+                    .map(|n| n.to_string_lossy().ends_with("-setup.exe"))
+                    .unwrap_or(false)
+            {
+                let _ = std::fs::remove_file(&p);
+            }
+        }
+    }
+    Ok(UpdateDownloaded {
+        path: dest.to_string_lossy().into_owned(),
+        size,
+        cached: false,
+    })
+}
+
+/// Finish the update after the download: wipe the old client data when the
+/// user confirmed (Ethan's "XÁC NHẬN"), then launch the new installer and
+/// quit this process entirely so the installer can replace the running exe.
+/// The installer is spawned with CREATE_NO_WINDOW on Windows — no console
+/// window, ever. On success this never returns (app.exit ends the process).
+/// Wipe scope: the whole app-data dir (store.json — battery state, flags)
+/// plus everything under the local-data dir EXCEPT updates/ (the installer
+/// itself lives there). Locked WebView2 profile files may survive the wipe
+/// — they are inert cache; the new install starts with fresh settings from
+/// the wiped store, and the installer replaces program files + shortcuts.
+#[tauri::command]
+fn finish_update(app: tauri::AppHandle, filename: String, wipe: bool) -> Result<(), String> {
+    if filename.contains(['/', '\\']) || filename == ".." || filename.is_empty() {
+        return Err("Invalid installer file name.".to_string());
+    }
+    let installer = updates_dir(&app)?.join(&filename);
+    if !installer.is_file() {
+        return Err("Downloaded installer not found — download it again.".to_string());
+    }
+    if wipe {
+        if let Ok(dir) = app.path().app_data_dir() {
+            remove_best_effort(&dir);
+        }
+        if let Ok(dir) = app.path().app_local_data_dir() {
+            if let Ok(entries) = std::fs::read_dir(&dir) {
+                for entry in entries.flatten() {
+                    if entry.file_name() == "updates" {
+                        continue;
+                    }
+                    remove_best_effort(&entry.path());
+                }
+            }
+        }
+    }
+    #[cfg(windows)]
+    {
+        use std::os::windows::process::CommandExt;
+        std::process::Command::new(&installer)
+            .creation_flags(0x0800_0000)
+            .spawn()
+            .map_err(|e| format!("Could not open the installer: {e}"))?;
+    }
+    #[cfg(not(windows))]
+    {
+        std::process::Command::new(&installer)
+            .spawn()
+            .map_err(|e| format!("Could not open the installer: {e}"))?;
+    }
     app.exit(0);
     Ok(())
 }
@@ -284,7 +435,8 @@ fn main() {
             notify_low_battery,
             tray_show_main,
             tray_quit,
-            install_update,
+            download_update,
+            finish_update,
         ])
         .setup(|app| {
             // --- Adaptive main window (v3.0.3): fit the design size to
@@ -328,8 +480,8 @@ fn main() {
                 });
             }
 
-            // --- Autostart default ON (Ethan: "tự động mở khi máy khởi
-            //     động"). Enabled once, on first run only — afterwards the
+            // --- Autostart default ON (Ethan: "open automatically when the PC
+            //     starts"). Enabled once, on first run only — afterwards the
             //     user's toggle choice is respected, never overwritten.
             let app_handle = app.handle().clone();
             if store::get_value(&app_handle, "autostart-initialized-v1").is_none() {
