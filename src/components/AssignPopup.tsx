@@ -1,11 +1,11 @@
 /**
  * AssignPopup — per image 4: dark panel, 4 tabs System / Keyboard /
  * Instruction / Macro, a list of actions to assign to one mouse button.
- * After choosing: the popup FLIES into the left panel frame (framer-motion) and only then writes.
+ * After choosing: the popup FLIES into the left panel frame (W6: Web Animations
+ * API, was framer-motion) and only then writes.
  * Actions come from the original app's systemKey catalog (chunk 515, module 5608).
  */
-import { useEffect, useState } from 'react';
-import { motion } from 'framer-motion';
+import { useEffect, useRef, useState } from 'react';
 import { Keyboard, X } from 'lucide-react';
 import { CODE_TO_HID, keyName, KEY_LABELS, SYSTEM_KEY_ACTIONS, type KeyBinding } from '../lib/hid';
 import { useMouse } from '../store';
@@ -72,9 +72,38 @@ export function AssignPopup({
     setFlying(b);
   };
 
-  const fly = flying
-    ? { x: flyTarget.x - (left + W / 2), y: flyTarget.y - (top + H / 2), scale: 0.35, opacity: 0 }
-    : { x: 0, y: 0, scale: 1, opacity: 1 };
+  // W6: the fly — was framer-motion (spring 380/30 + onAnimationComplete →
+  // onAssign). The popup flies toward the mouse button in the left panel and
+  // only then writes — that timing is behaviour, not decoration, so the WAAPI
+  // finish callback calls onAssign exactly once. Under reduced motion the
+  // write happens immediately with no flight.
+  const panelRef = useRef<HTMLDivElement | null>(null);
+  const flyDoneRef = useRef(false);
+  useEffect(() => {
+    if (!flying) return;
+    const el = panelRef.current;
+    if (!el || window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+      onAssign(flying);
+      return;
+    }
+    const dx = flyTarget.x - (left + W / 2);
+    const dy = flyTarget.y - (top + H / 2);
+    flyDoneRef.current = false;
+    const anim = el.animate(
+      [
+        { transform: 'translate(0px, 0px) scale(1)', opacity: 1 },
+        { transform: `translate(${dx}px, ${dy}px) scale(0.35)`, opacity: 0 },
+      ],
+      { duration: 380, easing: 'cubic-bezier(0.22, 1, 0.36, 1)', fill: 'forwards' },
+    );
+    anim.onfinish = () => {
+      if (flyDoneRef.current) return;
+      flyDoneRef.current = true;
+      onAssign(flying);
+    };
+    return () => anim.cancel();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [flying]);
 
   const groupsFor = (tabId: PopupTab): typeof SYSTEM_KEY_ACTIONS => {
     if (tabId === 'system') return SYSTEM_KEY_ACTIONS.filter((g) => g.id === 'mouse' || g.id === 'edit');
@@ -83,15 +112,10 @@ export function AssignPopup({
   };
 
   return (
-    <motion.div
-      className="absolute z-30 overflow-hidden rounded-2xl border border-white/15 bg-[#26262e] shadow-[0_24px_60px_rgba(0,0,0,0.55)]"
+    <div
+      ref={panelRef}
+      className="absolute z-30 w6-assign-in overflow-hidden rounded-2xl border border-white/15 bg-[#26262e] shadow-[0_24px_60px_rgba(0,0,0,0.55)]"
       style={{ left, top, width: W }}
-      initial={{ opacity: 0, scale: 0.92, y: 10 }}
-      animate={fly}
-      transition={{ type: 'spring', stiffness: 380, damping: 30 }}
-      onAnimationComplete={() => {
-        if (flying) onAssign(flying);
-      }}
       role="dialog"
       aria-label={`Assign key to ${KEY_LABELS[keyIndex]}`}
     >
@@ -212,6 +236,6 @@ export function AssignPopup({
           </div>
         )}
       </div>
-    </motion.div>
+    </div>
   );
 }

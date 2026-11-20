@@ -9,17 +9,15 @@
  * Logo: LIGHT brand file 800px (WHITE swoosh) — the loading screen background is ALWAYS
  * dark navy in both themes, so it always uses the white swoosh (Ethan's rule).
  */
-import { motion } from 'framer-motion';
 import { BRAND_ON_DARK } from '../lib/brand';
 
-export default function LoadingScreen(): React.JSX.Element {
+// W6: was framer-motion (enter opacity 0→1 + exit →0, 0.3s). Enter is now the
+// w6-loading-in keyframe; exit is the .loading-fading class — App keeps the
+// screen mounted 300ms after `loading` ends with `fading` set, then unmounts.
+export default function LoadingScreen({ fading = false }: { fading?: boolean }): React.JSX.Element {
   return (
-    <motion.div
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      exit={{ opacity: 0 }}
-      transition={{ duration: 0.3 }}
-      className="fixed inset-0 z-[100] flex flex-col items-center justify-center bg-[#0b0b26]/85 backdrop-blur-md"
+    <div
+      className={`w6-loading-in fixed inset-0 z-[100] flex flex-col items-center justify-center bg-[#0b0b26]/85 backdrop-blur-md${fading ? ' loading-fading' : ''}`}
       role="status"
       aria-label="Loading interface"
     >
@@ -93,6 +91,6 @@ export default function LoadingScreen(): React.JSX.Element {
         </g>
       </svg>
       <p className="mt-6 text-sm font-semibold tracking-wide text-white/85">Loading interface…</p>
-    </motion.div>
+    </div>
   );
 }

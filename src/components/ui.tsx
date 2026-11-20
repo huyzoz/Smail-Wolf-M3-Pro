@@ -4,7 +4,6 @@
  * no emoji as icons, contrast ≥4.5:1, reduced-motion respected (index.css).
  * Buttons stay SINGLE-layer (v1.1 lesson — no z-index:-1 decoration).
  */
-import { motion, AnimatePresence } from 'framer-motion';
 import { createPortal } from 'react-dom';
 import { Power, X } from 'lucide-react';
 import type { ReactNode } from 'react';
@@ -277,13 +276,14 @@ export function GlassCard({
   compact?: boolean;
 }): React.JSX.Element {
   return (
-    <motion.div
-      whileHover={hover ? { y: -4 } : undefined}
-      transition={{ type: 'spring', stiffness: 300, damping: 22 }}
+    // W6: was framer whileHover spring (300/22) — pure CSS now, only when
+    // the `hover` prop is true (see .panel-card[data-hover] in index.css).
+    <div
+      data-hover={hover ? '' : undefined}
       className={`panel-card ${compact ? 'p-2.5' : 'p-5'} ${className}`}
     >
       {children}
-    </motion.div>
+    </div>
   );
 }
 
@@ -351,32 +351,32 @@ export function Donut({
 // round "i" icon h-5 w-5, text-xs font-semibold text. Color by kind:
 // ok = green, info = blue, err = red. (Dropped the dark variant: the original's
 // because the app doesn't use Tailwind's dark class; the light pastel background fits the paper background.)
-// Enter/exit: framer-motion slides down from the top + fade (transform/opacity only,
+// Enter/exit (W6, was framer-motion): the w6-toast-in keyframe slides down from
+// the top + fade on mount; exit is the .toast-exiting class (transform/opacity only,
 // cheap on GPU) — the original has no self-running animation, only hover scale.
 export function Toasts(): React.JSX.Element {
   const { toasts } = useMouse();
   return (
     <div className="pointer-events-none fixed inset-x-0 top-3 z-50 flex justify-center px-4">
       <div className="pointer-events-auto w-[min(480px,100%)] space-y-2">
-        <AnimatePresence>
-          {toasts.map((t) => {
-            const color =
-              t.kind === 'ok'
-                ? 'bg-green-100 border-green-500 text-green-900 hover:bg-green-200'
-                : t.kind === 'err'
-                  ? 'bg-red-100 border-red-500 text-red-900 hover:bg-red-200'
-                  : 'bg-blue-100 border-blue-500 text-blue-900 hover:bg-blue-200';
-            const iconColor = t.kind === 'ok' ? 'text-green-600' : t.kind === 'err' ? 'text-red-600' : 'text-blue-600';
-            return (
-              <motion.div
-                key={t.id}
-                initial={{ opacity: 0, y: -12 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -12 }}
-                transition={{ duration: 0.25, ease: 'easeOut' }}
-                role={t.kind === 'err' ? 'alert' : 'status'}
-                className={`flex items-center rounded-lg border-l-4 p-2 transition duration-300 ease-in-out hover:scale-105 ${color}`}
-              >
+        {/* W6: was AnimatePresence + motion.div (enter y -12→0, exit reverse,
+            0.25s). Enter is now the w6-toast-in keyframe on mount; exit is the
+            .toast-exiting class (store marks the toast `exiting`, removes it
+            250ms later). */}
+        {toasts.map((t) => {
+          const color =
+            t.kind === 'ok'
+              ? 'bg-green-100 border-green-500 text-green-900 hover:bg-green-200'
+              : t.kind === 'err'
+                ? 'bg-red-100 border-red-500 text-red-900 hover:bg-red-200'
+                : 'bg-blue-100 border-blue-500 text-blue-900 hover:bg-blue-200';
+          const iconColor = t.kind === 'ok' ? 'text-green-600' : t.kind === 'err' ? 'text-red-600' : 'text-blue-600';
+          return (
+            <div
+              key={t.id}
+              role={t.kind === 'err' ? 'alert' : 'status'}
+              className={`w6-toast-in flex items-center rounded-lg border-l-4 p-2 transition duration-300 ease-in-out hover:scale-105 ${color}${t.exiting ? ' toast-exiting' : ''}`}
+            >
                 {t.kind === 'ok' ? (
                   <svg
                     stroke="currentColor"
@@ -424,10 +424,9 @@ export function Toasts(): React.JSX.Element {
                   </svg>
                 )}
                 <p className="text-xs font-semibold">{t.text}</p>
-              </motion.div>
+              </div>
             );
           })}
-        </AnimatePresence>
       </div>
     </div>
   );
@@ -467,10 +466,8 @@ export function ConfirmModal({
       aria-label={title}
       onClick={onCancel}
     >
-      <motion.div
-        initial={{ opacity: 0, scale: 0.96 }}
-        animate={{ opacity: 1, scale: 1 }}
-        className="panel-card w-full max-w-md p-6"
+      <div
+        className="panel-card w6-modal-in w-full max-w-md p-6"
         onClick={(e) => e.stopPropagation()}
       >
         <h3 className="text-lg font-bold text-[#edebe6]">{title}</h3>
@@ -483,7 +480,7 @@ export function ConfirmModal({
             {confirmLabel}
           </GlassButton>
         </div>
-      </motion.div>
+      </div>
     </div>,
     document.body,
   );
@@ -526,11 +523,8 @@ export function SlideUpConfirmModal({
       aria-label={title}
       onClick={onCancel}
     >
-      <motion.div
-        initial={{ opacity: 0, y: 24 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.22, ease: 'easeOut' }}
-        className="panel-card w-full max-w-md p-6"
+      <div
+        className="panel-card w6-fade-up w-full max-w-md p-6"
         onClick={(e) => e.stopPropagation()}
       >
         <h3 className="text-lg font-bold text-[#edebe6]">{title}</h3>
@@ -548,7 +542,7 @@ export function SlideUpConfirmModal({
             {confirmLabel}
           </GlassButton>
         </div>
-      </motion.div>
+      </div>
     </div>,
     document.body,
   );
@@ -583,11 +577,8 @@ export function WideModal({
       aria-label={title}
       onClick={closable ? onClose : undefined}
     >
-      <motion.div
-        initial={{ opacity: 0, y: 24 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.22, ease: 'easeOut' }}
-        className="panel-card flex max-h-[80vh] w-full max-w-3xl flex-col p-6"
+      <div
+        className="panel-card w6-fade-up flex max-h-[80vh] w-full max-w-3xl flex-col p-6"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex shrink-0 items-start justify-between gap-3">
@@ -611,7 +602,7 @@ export function WideModal({
             </GlassButton>
           </div>
         )}
-      </motion.div>
+      </div>
     </div>,
     document.body,
   );

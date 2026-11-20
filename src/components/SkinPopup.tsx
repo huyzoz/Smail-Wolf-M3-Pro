@@ -23,7 +23,6 @@
  */
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { motion } from 'framer-motion';
 import { Check, ChevronRight, X } from 'lucide-react';
 import { SKINS, skinById, skinThumbSrc, type SkinDef } from '../lib/skins';
 import { useMouse } from '../store';
@@ -305,11 +304,8 @@ export function SkinPopup({ open, onClose }: { open: boolean; onClose: () => voi
       aria-label="Mouse skin collection"
       onClick={onClose}
     >
-      <motion.div
-        initial={{ opacity: 0, scale: 0.96, y: 12 }}
-        animate={{ opacity: 1, scale: 1, y: 0 }}
-        transition={{ duration: 0.25 }}
-        className="flex max-h-[90vh] w-full max-w-[880px] flex-col overflow-hidden rounded-2xl bg-[var(--paper)] shadow-2xl"
+      <div
+        className="flex max-h-[90vh] w-full max-w-[880px] w6-pop-in flex-col overflow-hidden rounded-2xl bg-[var(--paper)] shadow-2xl"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Fixed header */}
@@ -443,7 +439,7 @@ export function SkinPopup({ open, onClose }: { open: boolean; onClose: () => voi
             Apply
           </GlassButton>
         </div>
-      </motion.div>
+      </div>
     </div>,
     document.body,
   );
