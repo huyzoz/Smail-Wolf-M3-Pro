@@ -263,6 +263,29 @@ tests/
 
 ## Changelog
 
+## v3.0.12 — timer audit: one toast exit, sweep pauses when hidden (2026-11-20)
+
+Wave 9 of the 19-wave overhaul — a full audit of every timer in the app:
+
+1. **One toast exit** — `addLog` and `pushToast` each carried an identical
+   nested timeout pair (4.5s → mark exiting → 250ms → remove), and manual
+   dismiss had the second half again. All three now go through one pair of
+   helpers (`scheduleToastExit` + `removeToastAfterExit`). Same timings,
+   same two-step fade, no duplicated code.
+2. **Sweep pauses when hidden** — the connection-cluster sweep cycled
+   every ~24s even with the window hidden to tray, re-rendering the top
+   bar for a band nobody could see. It now pauses on hide (band back to
+   icons) and restarts from the top on show.
+3. **Deliberately NOT paused while hidden** — the 1s simulated-battery
+   tick and the 30s live-battery poll keep running when the window is
+   hidden: the tray popup reads the live battery from them, so stopping
+   them would make the tray go stale. The tick's state updates were
+   already gated (W5), so its cost while hidden is negligible.
+
+Verified in the sandbox: tsc clean, 154/154 tests, new hidden-gating
+probe 5/5 (no sweep while hidden, resumes on show, mid-sweep hide
+resets to idle), sweep probe 5/5, W6 probe 13/13, DPI e2e 13/13.
+
 ## v3.0.11 — connection sweep, per-section colours, Firmware last (2026-11-20)
 
 Ethan's order from his v3.0.9 screenshot, in one release:
