@@ -16,12 +16,12 @@
    SMAILWOLF M3 Pro — Driver v2.0 "TRANSISTOR" theme
    Design system (per ui-ux-pro-max v2.15.0 query):
    - Style: Minimalism & Swiss Style (grid, clean, high contrast)
-   - Paper #E9E7E2 (ảnh 1) · Ink #16161A · Navy panel #17172B (ảnh 3)
-   - Accent orange #EA580C, button fill #C2410C (trắng trên đó ~4.7:1)
-   - Display Oswald (condensed, như headline ảnh 1) · Mono Fira Code
+   - Paper #E9E7E2 (image 1) · Ink #16161A · Navy panel #17172B (image 3)
+   - Accent orange #EA580C, button fill #C2410C (white on it ~4.7:1)
+   - Display Oswald (condensed, like the image 1 headline) · Mono Fira Code
      (skill) · Body Fira Sans (skill)
-   - Rules: contrast ≥4.5:1, target ≥44px, focus ring thấy rõ,
-     prefers-reduced-motion, SVG icon (lucide) — không emoji.
+   - Rules: contrast ≥4.5:1, target ≥44px, clearly visible focus ring,
+     prefers-reduced-motion, SVG icons (lucide) — no emoji.
    ============================================================ */
 
 :root {
@@ -43,18 +43,18 @@
   --danger: #dc2626;
   --line-paper: rgba(22, 22, 26, 0.14);
   --line-navy: rgba(255, 255, 255, 0.1);
-  /* Lưới ô vuông nền trang (body + DevicePicker dùng CHUNG 1 token nên
-     trong == ngoài, kể cả khi đổi theme). */
+  /* Page background square grid (body + DevicePicker share ONE token, so
+     inside == outside, even when the theme changes). */
   --grid-line: rgba(22, 22, 26, 0.05);
-  /* Bề mặt sáng (dock, popup skin, pill topbar) — dark theme map lại. */
+  /* Light surfaces (dock, skin popup, topbar pill) — remapped by the dark theme. */
   --surface: #ffffff;
   --surface-2: #f4f4f2;
   --surface-solid: rgba(255, 255, 255, 0.82);
 }
 
-/* v3.0 — DARK THEME (token map lại, không đổi component): nền giấy tối,
-   chữ sáng, lưới ô vuông sáng mờ, bề mặt tối. Panel navy giữ nguyên
-   (đã tối sẵn nên dùng chung cả 2 theme). */
+/* v3.0 — DARK THEME (tokens remapped, components unchanged): dark paper background,
+   light text, faint light square grid, dark surfaces. The navy panel stays as-is
+   (already dark, so it is shared by both themes). */
 :root[data-theme="dark"] {
   --paper: #10101d;
   --paper-2: #17172b;
@@ -82,9 +82,10 @@ body {
   font-family: "Fira Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
   font-size: 16px;
   line-height: 1.5;
-  /* v3.0: theme đổi thì màu nền/chữ TRÔI sang (0.5s), không đổi tức thì
-     (pro-max §2 — no instant state changes). */
-  transition: background-color 0.5s ease, color 0.5s ease;
+  /* v3.0: when the theme changes, bg/text colors GLIDE over (0.25s) instead of switching instantly
+     (pro-max §2 — no instant state changes). Redesign 2026-11-19 (e): 0.5s felt laggy on weak
+     hardware — 0.25s is the same glide, just snappier; the shim targets below glide with it. */
+  transition: background-color 0.25s ease, color 0.25s ease;
 }
 
 .font-display {
@@ -106,7 +107,7 @@ body {
   outline-color: var(--accent-soft);
 }
 
-/* ---------- Buttons: SINGLE layer (bài học v1.1 — không lớp z-index:-1) ---------- */
+/* ---------- Buttons: SINGLE layer (v1.1 lesson — no z-index:-1 layer) ---------- */
 .uiv-btn {
   display: inline-flex;
   align-items: center;
@@ -144,8 +145,8 @@ body {
   color: var(--ink);
   border-color: var(--line-paper);
   box-shadow: none;
-  /* v2.4: bỏ backdrop-filter (đắt GPU, gây lag khi lướt) — nền đặc hơn
-     nên vẫn giữ cảm giác kính mờ mà không cần blur thật. */
+  /* v2.4: removed backdrop-filter (GPU-expensive, causes lag while scrolling) — more solid background
+     so it still feels like frosted glass without real blur. */
 }
 .uiv-btn-ghost:hover:not(:disabled) {
   background: rgba(255, 255, 255, 0.85);
@@ -170,7 +171,7 @@ body {
 }
 
 /* ---------- Ghost button with floating blob (Uiverse purple-otter-7, verbatim
-   structure, blob recolored orange). SAFETY (bài học v1.1): the blob svg gets
+   structure, blob recolored orange). SAFETY (v1.1 lesson): the blob svg gets
    pointer-events:none so it can never eat a click. ---------- */
 .uiv-blob-btn {
   position: relative;
@@ -257,9 +258,9 @@ body {
   box-shadow: 0 2px 8px rgba(22, 22, 26, 0.35);
 }
 
-/* ---------- Tab chuyển (v2.4) — animation CSS thuần, thay AnimatePresence
-   mode="wait" (kẹt exit sau modal macro). Chỉ opacity + translateY, chạy
-   trên GPU, không có exit tracking để kẹt. ---------- */
+/* ---------- Tab switch (v2.4) — pure CSS animation, replacing AnimatePresence
+   mode="wait" (exit stuck after the macro modal). Opacity + translateY only, runs
+   on the GPU, no exit tracking to get stuck. ---------- */
 .tab-enter {
   animation: tabIn 0.22s ease-out;
   will-change: opacity, transform;
@@ -269,8 +270,8 @@ body {
   to { opacity: 1; transform: translateY(0); }
 }
 
-/* ---------- DPI slider (v2.4, y như ảnh bro gửi): track fill đổi màu dần
-   theo DPI (background set inline từ component), thumb trắng tròn. ---------- */
+/* ---------- DPI slider (v2.4, exactly like the image Ethan sent): track fill gradually changes color
+   with DPI (background set inline from the component), round white thumb. ---------- */
 .uiv-dpi-slider {
   -webkit-appearance: none;
   appearance: none;
@@ -401,8 +402,8 @@ body {
   fill: rgb(255, 255, 255);
 }
 
-/* ---------- Slide-in toast (Uiverse gentle-octopus-87) ĐÃ XÓA ở v2.4 —
-   Toasts giờ dùng Uiverse empty-wolverine-58 (Cybercom682) ở đầu trang,
+/* ---------- Slide-in toast (Uiverse gentle-octopus-87) REMOVED in v2.4 —
+   Toasts now use Uiverse empty-wolverine-58 (Cybercom682) at the top of the page,
    xem component Toasts trong ui.tsx. ---------- */
 
 /* ---------- Square snake loader (Uiverse grumpy-stingray-26, verbatim
@@ -474,7 +475,7 @@ body {
 }
 .uiv-stripe-inner:hover {
   background-color: rgba(23, 23, 43, 0.92);
-  /* v2.4: bỏ backdrop-filter ở hover (đắt GPU) — chỉ đổi màu nền. */
+  /* v2.4: removed backdrop-filter on hover (GPU-expensive) — only the background color changes. */
 }
 @keyframes uiv-stripe-move {
   0% { background-position: 0px; }
@@ -488,8 +489,8 @@ body {
   background: linear-gradient(10deg, rgba(38, 146, 255, 1) 0%, rgba(0, 63, 255, 1) 100%);
   border-radius: 16px;
   box-shadow: 0 4px 30px rgba(0, 0, 0, 0.1);
-  /* v2.4: bỏ backdrop-filter — nền gradient ĐẶC nên blur không có tác
-     dụng gì nhìn thấy, chỉ tốn GPU. */
+  /* v2.4: removed backdrop-filter — the gradient background is SOLID, so blur has no
+     visible effect, only GPU cost. */
   border: 1px solid rgba(255, 255, 255, 0.3);
   overflow: hidden;
 }
@@ -518,15 +519,15 @@ body {
 }
 
 /* ---------- Frosted dock (top stat cards, light glass on paper) ----------
-   v2.4: bỏ backdrop-filter blur(18px) saturate(1.2) — đây là thủ phạm lag
-   lớn nhất khi lướt (4 dock lớn, blur nặng, GPU yếu phải vẽ lại nền mỗi
-   khung). Nền trắng đặc hơn (0.82) vẫn giữ cảm giác kính, không cần blur. */
+   v2.4: removed backdrop-filter blur(18px) saturate(1.2) — this was the biggest lag culprit
+   while scrolling (4 large docks, heavy blur, a weak GPU redrawing the background every
+   frame). A more solid white background (0.82) still feels glassy without blur. */
 .dock {
   background: rgba(255, 255, 255, 0.82);
   border: 1px solid rgba(22, 22, 26, 0.14);
   border-radius: 16px;
   box-shadow: 0 8px 24px rgba(22, 22, 26, 0.08);
-  transition: transform 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
+  transition: transform 0.2s ease, border-color 0.25s ease, box-shadow 0.2s ease, background-color 0.25s ease;
 }
 .dock:hover {
   transform: translateY(-2px);
@@ -546,17 +547,17 @@ body {
   color: var(--paper-on-navy);
 }
 
-/* ---------- Shy-moth-10 button (Uiverse Li-Deheng, v2.5) — thay TẤT CẢ
-   nút segmented (polling, hướng lăn) + thẻ nấc DPI + preset tác vụ; hiệu
-   ứng viền xoay serious-monkey-58 ĐÃ XÓA hết theo lệnh bro.
-   Cơ chế nguyên văn: pill bo tròn 100px, mũi tên 3 chevron (SVG) trượt
-   sang phải khi hover + nhấp nháy màu (color_anim), hover có outline
-   pulse 1s (btn-content). Chỉ đổi: màu hồng #ff135a → cam app #EA580C,
-   font 30px → 13–14px, padding 5px 30px → 6px 12px, mũi tên 66px → ~14px,
-   khoảng trượt 25px → 6px, id SVG (#arrow-icon-*) → class (tránh trùng id
-   khi dùng 12 nút trên 1 trang), tên class prefix uiv-shy-.
-   --uiv-shy-bg: màu nền nút (cam khi chọn, tối khi chưa chọn) — chevron
-   nhấp nháy về đúng màu nền đó. ---------- */
+/* ---------- Shy-moth-10 button (Uiverse Li-Deheng, v2.5) — replaces ALL
+   segmented buttons (polling, scroll direction) + DPI stage cards + task presets; the
+   serious-monkey-58 rotating-border effect was REMOVED entirely per Ethan's order.
+   Verbatim mechanism: 100px rounded pill, 3-chevron arrow (SVG) sliding
+   right on hover + color blinking (color_anim), hover shows an outline
+   pulse 1s (btn-content). Only changed: pink #ff135a → app orange #EA580C,
+   font 30px → 13–14px, padding 5px 30px → 6px 12px, arrow 66px → ~14px,
+   slide distance 25px → 6px, SVG id (#arrow-icon-*) → class (avoids duplicate ids
+   when 12 buttons share one page), class name prefix uiv-shy-.
+   --uiv-shy-bg: button background color (orange when selected, dark when not) — chevrons
+   blink back to exactly that background color. ---------- */
 .uiv-shy-btn {
   --uiv-shy-bg: #ea580c;
   display: inline-flex;
@@ -595,12 +596,12 @@ body {
   color: #edebe6;
   border-color: rgba(255, 90, 31, 0.5);
 }
-/* Bản gọn cho thẻ nấc DPI (6 nấc 1 hàng, mỗi ô ~77px): padding hẹp hơn. */
+/* Compact version for DPI stage cards (6 stages in one row, ~77px each): tighter padding. */
 .uiv-shy-btn.uiv-shy-compact {
   padding: 6px 8px;
 }
-/* Mũi tên 3 chevron (SVG gốc, thu nhỏ): mặc định các chevron chụm lại
-   (translateX -60%/-30%), hover thì bung ra + nhấp nháy màu. */
+/* 3-chevron arrow (original SVG, scaled down): by default the chevrons cluster together
+   (translateX -60%/-30%), on hover they spread out + blink color. */
 .uiv-shy-arrow {
   width: 16px;
   height: 11px;
@@ -608,7 +609,7 @@ body {
   margin-left: 2px;
   transition: 0.5s;
 }
-/* Mũi tên nhỏ cho thẻ nấc DPI (ô hẹp). */
+/* Small arrow for DPI stage cards (narrow cells). */
 .uiv-shy-arrow-sm {
   width: 12px;
   height: 8px;
@@ -631,10 +632,10 @@ body {
   0% { outline: 0.2em solid var(--uiv-shy-bg); outline-offset: 0; }
 }
 
-/* ---------- Ancient-yak-42 loader (Uiverse Nawsome, v2.5) — la bàn SVG
-   cho màn loading 5s sau khi kết nối. Nguyên văn cả HTML lẫn CSS (xem
-   loaders/ancient-yak-42.html): 2 vòng xoay xanh/cyan + 8 tick nhấp nháy
-   + kim la bàn đỏ xoay, chu kỳ 2s. Chỉ dùng 1 instance nên giữ nguyên
+/* ---------- Ancient-yak-42 loader (Uiverse Nawsome, v2.5) — SVG compass
+   for the 5s loading screen after connecting. Verbatim HTML and CSS (see
+   loaders/ancient-yak-42.html): 2 blue/cyan spinning rings + 8 blinking ticks
+   + a red rotating compass needle, 2s cycle. Only 1 instance is used, so kept as-is
    id SVG (grad/mask1/mask2). ---------- */
 .pl {
   display: block;
@@ -692,10 +693,10 @@ body {
   14%, 36% { stroke-dashoffset: 0; }
 }
 
-/* ---------- Màn chọn thiết bị (v2.5, theo app gốc ảnh 3): nền sao tối.
-   Nền navy đậm + 3 lớp chấm sao (radial-gradient lặp theo ô vuông, kích
-   cỡ/mật độ khác nhau) + quầng sáng mờ ở giữa. Tĩnh, không animation
-   (đỡ tốn GPU trên máy yếu). ---------- */
+/* ---------- Device picker screen (v2.5, following the original app in image 3): dark starry background.
+   Deep navy background + 3 layers of star dots (radial-gradient repeated per square, different
+   sizes/densities) + a soft glow in the middle. Static, no animation
+   (easier on a weak GPU). ---------- */
 .device-stars {
   background-color: #0b0b26;
   background-image:
@@ -720,8 +721,8 @@ body {
     200px 200px;
 }
 
-/* ---------- Giao diện chính trôi lên sau loading 5s (v2.5): fade + rise,
-   chỉ opacity/transform (GPU). Dùng kèm animation-delay để lệch nhịp. ---------- */
+/* ---------- Main UI rises up after the 5s loading (v2.5): fade + rise,
+   opacity/transform only (GPU). Used with animation-delay for staggered timing. ---------- */
 .app-enter {
   animation: appEnter 0.6s ease-out both;
   will-change: opacity, transform;
@@ -746,7 +747,7 @@ body {
   to { transform: rotate(360deg); }
 }
 
-/* ---------- Marquee (bottom strip, ảnh 1) ---------- */
+/* ---------- Marquee (bottom strip, image 1) ---------- */
 .marquee {
   overflow: hidden;
   white-space: nowrap;
@@ -756,7 +757,7 @@ body {
   gap: 0;
   width: max-content;
   animation: marquee-scroll 36s linear infinite;
-  /* v2.4: will-change để marquee chạy trên GPU (chỉ transform, không repaint). */
+  /* v2.4: will-change so the marquee runs on the GPU (transform only, no repaint). */
   will-change: transform;
 }
 @keyframes marquee-scroll {
@@ -766,8 +767,8 @@ body {
 /* ---------- 3D mouse stage labels ---------- */
 .mouse-label {
   position: absolute;
-  /* Chấm (dot) nằm đúng tọa độ anchor: nút mở rộng ra ngoài theo side,
-     không căn giữa cả nút lên anchor như trước (tag đè lên thân chuột). */
+  /* The dot sits exactly on the anchor position: the button extends outward along its side,
+     instead of centering the whole button on the anchor as before (tag overlapping the mouse body). */
   transform: translateY(-50%);
   display: flex;
   align-items: center;
@@ -796,8 +797,8 @@ body {
   font-weight: 600;
   letter-spacing: 0.08em;
   text-transform: uppercase;
-  /* Tag kiểu ảnh 2: viền mảnh, nền trong suốt, chữ mực — không còn pill
-     đen đặc như v2.0 (trông nặng, che mất thân chuột). */
+  /* Image-2 style tag: thin border, transparent background, ink text — no more solid black
+     pill like v2.0 (looked heavy, hid the mouse body). */
   background: transparent;
   color: #16161a;
   border: 1px solid rgba(22, 22, 26, 0.7);
@@ -811,9 +812,9 @@ body {
     padding: 3px 6px;
   }
 }
-/* ---------- Hover glow từng phần tử chuột (v2.6) ---------- */
-/* Lớp cam phủ đúng hình nút đang được rê vào: multiply nhuộm cam lên
-   thân chuột trắng + hào quang ngoài. .on nảy nhẹ như bấm thật
+/* ---------- Hover glow per mouse part (v2.6) ---------- */
+/* Orange layer covering exactly the hovered button's shape: multiply tints the
+   white mouse body orange + outer halo. .on bounces lightly like a real click
    (scale 1 -> 0.94 -> 1.03 -> 1, translateY 2px). */
 .part-glow {
   position: absolute;
@@ -841,9 +842,9 @@ body {
   100% { transform: scale(1) translateY(0); }
 }
 
-/* ---------- Logo aura trắng (v2.6) ---------- */
-/* Wordmark SMAILWOLF đen trên nền sao tối bị chìm — hào quang trắng mờ
-   sau logo (dùng ở màn chọn thiết bị + màn loading). */
+/* ---------- White logo aura (v2.6) ---------- */
+/* The black SMAILWOLF wordmark sinks into the dark starry background — a soft white halo
+   behind the logo (used on the device picker + loading screens). */
 .logo-aura {
   position: relative;
   display: inline-block;
@@ -866,7 +867,7 @@ body {
   position: relative;
 }
 
-/* ---------- Sao nhấp nháy nền chọn thiết bị (v2.6) ---------- */
+/* ---------- Blinking stars on the device picker background (v2.6) ---------- */
 .device-stars-twinkle {
   background-image:
     radial-gradient(1.5px 1.5px at 12% 22%, rgba(255, 255, 255, 0.9) 50%, transparent 51%),
@@ -884,7 +885,7 @@ body {
 
 .mouse-label:hover .tag,
 .mouse-label.cyber-on .tag {
-  /* Cyberpunk khi rê vào nút: nền navy, chữ cam neon, viền + hào quang. */
+  /* Cyberpunk on button hover: navy background, neon orange text, border + halo. */
   background: #17172b;
   color: #ff5a1f;
   border-color: #ff5a1f;
@@ -948,12 +949,12 @@ body {
 }
 
 /* ============================================================
-   v3.0 — DARK THEME SHIM (attribute selectors, không sửa component):
-   Các bề mặt SÁNG dùng class Tailwind hardcode hex (#16161a, #55555c,
-   bg-white/50…) được map lại khi <html data-theme="dark">. Panel navy
-   + popup tối đã đúng cả 2 theme nên không nằm trong shim này.
-   KHÔNG dim/mờ màu ở đâu — chỉ đổi sang giá trị tối tương đương,
-   giữ nguyên độ tương phản ≥4.5:1.
+   v3.0 — DARK THEME SHIM (attribute selectors, no component changes):
+   LIGHT surfaces using hardcoded Tailwind hex classes (#16161a, #55555c,
+   bg-white/50…) are remapped when <html data-theme="dark">. The navy panel
+   + dark popup are already right in both themes, so they are not in this shim.
+   NO dimming/fading of colors anywhere — only switch to the equivalent dark value,
+   keeping contrast ≥4.5:1.
    ============================================================ */
 html[data-theme="dark"] .dock {
   background: var(--surface-solid);
@@ -980,7 +981,7 @@ html[data-theme="dark"] [class*="border-[rgba(22,22,26,0.16)]"] { border-color: 
 html[data-theme="dark"] [class*="border-[rgba(22,22,26,0.2)]"] { border-color: rgba(255, 255, 255, 0.22) !important; }
 html[data-theme="dark"] [class*="bg-white/50"]:hover,
 html[data-theme="dark"] [class*="hover:bg-white/80"]:hover { background-color: rgba(255, 255, 255, 0.14) !important; }
-/* Tag chuột trên nền giấy tối: nền navy mờ + chữ sáng, viền sáng. */
+/* Mouse tag on dark paper background: translucent navy bg + light text, light border. */
 html[data-theme="dark"] .mouse-label .tag {
   color: #edebe6;
   border-color: rgba(255, 255, 255, 0.6);
@@ -992,7 +993,7 @@ html[data-theme="dark"] .mouse-label .dot {
   border-color: #edebe6;
   box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.25);
 }
-/* Nút ghost trên nền tối. */
+/* Ghost button on a dark background. */
 html[data-theme="dark"] .uiv-btn-ghost {
   background: rgba(255, 255, 255, 0.08);
   color: var(--paper-on-navy);
@@ -1003,8 +1004,33 @@ html[data-theme="dark"] .uiv-btn-ghost:hover:not(:disabled) {
   border-color: rgba(255, 255, 255, 0.4);
 }
 
-/* ---------- v3.0: Light-sweep khi đổi theme (không đổi tức thì) ----------
-   Dải sáng chéo quét ngang màn hình 0.55s khi theme đổi; pointer-events
+/* ---------- Redesign 2026-11-19 (e): theme change glides instead of snapping ----------
+   The dark shim above flips these colors instantly while the body glides — half the
+   page snaps, half glides, which reads as lag. This rule (no data-theme qualifier,
+   so it holds in BOTH themes) gives the same short 0.25s glide to every surface the
+   shim touches. .dock is NOT in this list — it keeps its own merged transition
+   (transform + box-shadow must survive). Narrow casualty: an element here that also
+   uses Tailwind's plain `transition` loses its transform/opacity transition — on
+   these elements that is only the disabled-opacity fade, imperceptible. */
+[class*="text-[#16161a]"],
+[class*="text-[#33333a]"],
+[class*="text-[#55555c]"],
+[class*="text-[#6b6b76]"],
+[class*="bg-[#e9e7e2]"],
+[class*="bg-[#f4f4f2]"],
+[class*="bg-white/50"],
+[class*="bg-white/60"],
+[class*="bg-white/70"],
+[class*="bg-white/85"],
+[class*="border-[rgba(22,22,26,0.12)]"],
+[class*="border-[rgba(22,22,26,0.14)]"],
+[class*="border-[rgba(22,22,26,0.16)]"],
+[class*="border-[rgba(22,22,26,0.2)]"] {
+  transition: background-color 0.25s ease, color 0.25s ease, border-color 0.25s ease;
+}
+
+/* ---------- v3.0: Light-sweep on theme change (no instant switch) ----------
+   A diagonal light band sweeps across the screen for 0.55s when the theme changes; pointer-events
    none, transform-only (GPU). */
 .theme-sweep-band {
   position: fixed;
@@ -1022,10 +1048,10 @@ html[data-theme="dark"] .uiv-btn-ghost:hover:not(:disabled) {
   to { transform: translateX(150vw) skewX(-12deg); }
 }
 
-/* ---------- v3.0: Cursor blob đỏ — liquid-glass đuổi theo con trỏ ----------
-   KHÔNG phải icon con trỏ: 1 blob tròn đỏ, kính lỏng (blur + viền sáng),
-   đuổi theo pointer bằng rAF lerp (transform/opacity-only), toàn app
-   (kể cả trong khung quản lý). Tôn trọng prefers-reduced-motion (ẩn). */
+/* ---------- v3.0: Red cursor blob — liquid glass chasing the pointer ----------
+   NOT a cursor icon: one round red blob, liquid glass (blur + bright border),
+   chasing the pointer via rAF lerp (transform/opacity-only), app-wide
+   (including inside the management frame). Respects prefers-reduced-motion (hidden). */
 .cursor-blob {
   position: fixed;
   left: 0;
@@ -1040,9 +1066,9 @@ html[data-theme="dark"] .uiv-btn-ghost:hover:not(:disabled) {
     radial-gradient(circle at 50% 50%, rgba(255, 64, 32, 0.5), rgba(255, 32, 16, 0.16) 58%, rgba(255, 32, 16, 0) 72%);
   border: 1px solid rgba(255, 255, 255, 0.4);
   box-shadow: 0 0 14px rgba(255, 64, 32, 0.28), inset 0 0 10px rgba(255, 255, 255, 0.18);
-  /* W4 (v3.0.8): blur 6px + saturate -> 4px, không saturate — blob di
-     chuyển liên tục nên mỗi px blur/saturate đều tính lại theo từng frame;
-     4px giữ nguyên vẻ kính lỏng mà rẻ hơn rõ trên GPU yếu. */
+  /* W4 (v3.0.8): blur 6px + saturate -> 4px, no saturate — the blob moves
+     continuously, so every px of blur/saturate is recomputed per frame;
+     4px keeps the liquid-glass look while being clearly cheaper on a weak GPU. */
   backdrop-filter: blur(4px);
   -webkit-backdrop-filter: blur(4px);
   will-change: transform, opacity;
@@ -1060,9 +1086,9 @@ html[data-theme="dark"] .uiv-btn-ghost:hover:not(:disabled) {
 /* ============================================================
    UIVERSE — "Switch" by mamyapro123 (Hari Bro), MIT License
    Source: https://uiverse.io/mamyapro123/cuddly-warthog-66
-   VERBATIM từ src/components/uiverse/THEME-SWITCH.css (final stable
-   --toggle-size: 32px). Chỉ --toggle-size được override inline ở
-   component ThemeToggle cho vừa khung. Checkbox checked = DARK.
+   VERBATIM from src/components/uiverse/THEME-SWITCH.css (final stable
+   --toggle-size: 32px). Only --toggle-size is overridden inline in the
+   ThemeToggle component to fit the frame. Checkbox checked = DARK.
    ============================================================ */
 /* UIVERSE — "Switch" by mamyapro123 (Hari Bro), MIT License
    Source: https://uiverse.io/mamyapro123/cuddly-warthog-66
@@ -1764,7 +1790,7 @@ html[data-theme="dark"] .uiv-btn-ghost:hover:not(:disabled) {
   }
 }
 
-/* v3.0: reduced-motion — tắt animation của theme-switch + blob + sweep. */
+/* v3.0: reduced-motion — turns off theme-switch + blob + sweep animations. */
 @media (prefers-reduced-motion: reduce) {
   .theme-switch *,
   .theme-switch *::before,
@@ -1775,7 +1801,25 @@ html[data-theme="dark"] .uiv-btn-ghost:hover:not(:disabled) {
   body { transition: none; }
 }
 
-/* ---------- v3.0: Nền màn chọn thiết bị = nền body, ô 56px (trong == ngoài) ---------- */
+/* ---------- Redesign 2026-11-19 (b): theme toggle sits FLUSH — Ethan's order ----------
+   Verbatim Uiverse travel is 1.875em: the moon disc stops 5.3px short of the
+   pill's right edge. Ethan: pressing it must slide flush to the edge, never
+   overflow outside. Geometry at --toggle-size 14px (all em here, measured live
+   2026-11-20): the pill is 5.625 wide; the circle wrapper is FLEX-CENTERED in
+   it (not left-anchored), so the sun disc rests at 1.25em from the left edge.
+   Disc is 2.125 wide; flush-right disc left = 5.625 - 0.125 - 2.125 = 3.375em;
+   travel = 3.375 - 1.25 = 2.125em. The disc then ends 1.75px from the right
+   edge. Same selector as the verbatim rule, later in the file, so it wins
+   without touching Uiverse CSS. (The circle wrapper itself sticks out past the
+   pill when checked, but its ::before rays fade to opacity 0 in dark mode and
+   the pill clips the rest.) */
+.theme-switch__checkbox:checked
+  ~ .theme-switch__container
+  .theme-switch__circle-container {
+  transform: translateX(calc(2.125em));
+}
+
+/* ---------- v3.0: Device picker background = body background, 56px squares (inside == outside) ---------- */
 .picker-bg {
   background-color: var(--paper);
   background-image:
@@ -1785,12 +1829,51 @@ html[data-theme="dark"] .uiv-btn-ghost:hover:not(:disabled) {
   transition: background-color 0.5s ease;
 }
 
-/* ---------- W4 (v3.0.8): Chế độ nhẹ — html.lite ----------
-   Tắt hết blur nền để nhẹ GPU máy yếu. Các lớp phủ đều có nền mờ đặc
-   sẵn (bg-black/60, bg-[#17172b]/95, bg-[#0b0b26]/85) nên bỏ blur vẫn
-   đọc được; chỉ veil tải skin là trong suốt nên cho nền đặc riêng.
-   Blob đỏ vẫn đuổi chuột (gradient + shadow rẻ), chỉ mất lớp kính.
-   KHÔNG đụng gì tới chuột — thuần giao diện. */
+/* ---------- Redesign 2026-11-19: "M3 Pro" gradient band + connection-mode icons ---------- */
+/* "M3 Pro" — red-orange gradient band running through the text. Cheap: only
+   background-position animates on a tiny text node; static gradient under
+   reduced motion. */
+.m3pro-band {
+  background: linear-gradient(90deg, #dc2626, #ea580c, #ff8a3d, #ea580c, #dc2626);
+  background-size: 200% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  animation: m3pro-band-slide 3s linear infinite;
+}
+@keyframes m3pro-band-slide {
+  to { background-position: 200% 0; }
+}
+
+/* Connection-mode icons in the topbar cluster: dim by default, the active one
+   glows orange, hovering any icon bounces it up (springy ease). */
+.conn-icon {
+  display: inline-flex;
+  color: rgba(85, 85, 92, 0.4);
+  transition: transform 180ms cubic-bezier(0.34, 1.56, 0.64, 1), color 180ms ease, filter 180ms ease;
+}
+.conn-icon:hover {
+  transform: translateY(-3px);
+  color: #55555c;
+}
+.conn-icon-active {
+  color: #c2410c;
+  filter: drop-shadow(0 0 6px rgba(234, 88, 12, 0.65));
+}
+.conn-icon-active:hover {
+  color: #ea580c;
+}
+@media (prefers-reduced-motion: reduce) {
+  .m3pro-band { animation: none; }
+  .conn-icon { transition: none; }
+}
+
+/* ---------- W4 (v3.0.8): Lite mode — html.lite ----------
+   Turns off all background blur to lighten the GPU on weak PCs. All overlays already have a solid translucent
+   background (bg-black/60, bg-[#17172b]/95, bg-[#0b0b26]/85), so dropping blur still reads
+   fine; only the skin-loading veil is transparent, so it gets its own solid background.
+   The red blob still chases the pointer (cheap gradient + shadow), it only loses the glass layer.
+   Does NOT touch the mouse — purely UI. */
 html.lite .backdrop-blur-sm,
 html.lite .backdrop-blur-md,
 html.lite .cursor-blob {

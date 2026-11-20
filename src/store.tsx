@@ -50,6 +50,8 @@ import {
 import {
   DEFAULT_CONFIG,
   DEFAULT_KEYS,
+  WIRED_VID,
+  isWiredDevicePresent,
   type FullRead,
   type KeyBinding,
   type MacroDef,
@@ -67,20 +69,20 @@ export interface Toast {
   text: string;
 }
 
-const ts = (): string => new Date().toLocaleTimeString('vi-VN');
+const ts = (): string => new Date().toLocaleTimeString('en-GB');
 
 interface MouseStore {
   mode: 'demo' | 'live';
   connected: boolean;
   connecting: boolean;
-  /** v2.5: đang load 3s (ancient-yak-42) sau khi kết nối, trước khi vào
-      giao diện chính. (v3.0: rút từ 5s xuống 3s theo yêu cầu của bro.) */
+  /** v2.5: 3s loading (ancient-yak-42) after connecting, before entering
+      the main UI. (v3.0: cut from 5s to 3s per Ethan's request.) */
   loading: boolean;
-  /** v3.0: theme sáng/tối toàn app (Uiverse toggle ở TopBar). */
+  /** v3.0: app-wide light/dark theme (Uiverse toggle in TopBar). */
   theme: AppTheme;
   toggleTheme: () => void;
-  /** W4 (v3.0.8): Chế độ nhẹ — tắt hết blur nền (blob, toast, modal) cho
-      máy yếu; chỉ đổi giao diện, không đụng gì tới chuột. */
+  /** W4 (v3.0.8): Lite mode — turns off all background blur (blob, toast, modal) for
+      low-end PCs; UI-only, never touches the mouse. */
   lite: boolean;
   toggleLite: () => void;
   busy: boolean;
@@ -91,19 +93,19 @@ interface MouseStore {
   battery: number | null;
   chargeFlag: number | null;
   batteryHistory: BatteryHistoryEntry[];
-  /** v3.1 — pin MÔ PHỎNG (ước tính, xem src/lib/battery.ts). `battery`
-      (report 48) là giá trị thô của firmware, KHÔNG hiện ra UI nữa. */
+  /** v3.1 — SIMULATED battery (estimated, see src/lib/battery.ts). `battery`
+      (report 48) is the firmware's raw value, NO LONGER shown in the UI. */
   simPct: number;
-  /** v3.0.2 — % pin 1 số thập phân (hiển thị): xả 3 mA thì % nguyên ngồi
-      yên ở 100% suốt 13 giờ đầu, còn 1 số lẻ tụt 0.1 mỗi ~8 phút — nhìn
-      thấy pin tụt thật. Logic (ngưỡng 20%, saver) vẫn dùng simPct nguyên. */
+  /** v3.0.2 — battery % with 1 decimal (display): at 3 mA drain the whole % sits
+      still at 100% for the first 13 hours, while 1 decimal drops 0.1 every ~8 min — you can
+      actually see the battery drop. Logic (20% threshold, saver) still uses whole simPct. */
   simPctPrecise: number;
   simCharging: boolean;
   simSaver: boolean;
   simRemainingMah: number;
   simPollingHz: number;
-  /** Bật/tắt Tiết kiệm pin: ghi polling 125 Hz + DPI 1600 qua setConfig,
-      tắt thì khôi phục rate/DPI đã lưu. Trả false nếu chưa kết nối/ghi lỗi. */
+  /** Toggle Battery saver: writes polling 125 Hz + DPI 1600 via setConfig,
+      off restores the saved rate/DPI. Returns false if not connected or the write fails. */
   setBatterySaver: (on: boolean) => Promise<boolean>;
   lastBatteryRead: string | null;
   batteryReads: number;
@@ -117,13 +119,18 @@ interface MouseStore {
   dpiListening: boolean;
   tab: TabId;
   setTab: (t: TabId) => void;
-  // v2.7: skin chuột đang chọn (chỉ giao diện, lưu localStorage).
+  // v2.7: selected mouse skin (UI-only, saved to localStorage).
   skinId: string;
   setSkinId: (id: string) => void;
-  // v2.6: picked = thiết bị cụ thể bro bấm trong danh sách quét.
+  // v2.6: picked = the specific device Ethan clicked in the scan list.
   connect: (mode: 'demo' | 'live', picked?: unknown) => Promise<void>;
   disconnect: () => Promise<void>;
   refresh: () => Promise<void>;
+  // v3.0.9 — shared update starter: the AppUpdateGate owns the download →
+  // progress → wipe flow; the Firmware section's Update button just opens
+  // that same flow instead of running its own copy.
+  registerUpdateStarter: (fn: (() => void) | null) => void;
+  startAppUpdate: () => void;
   readBatteryNow: () => Promise<void>;
   saveConfig: (next: MouseConfig) => Promise<boolean>;
   saveKeys: (next: KeyBinding[]) => Promise<boolean>;
@@ -153,7 +160,7 @@ export function MouseProvider({ children }: { children: ReactNode }): React.JSX.
   const [connecting, setConnecting] = useState(false);
   const [loading, setLoading] = useState(false);
   const loadingTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  // v3.0: theme toàn app — mặc định sáng, nhớ lựa chọn vào localStorage.
+  // v3.0: app-wide theme — light by default, choice saved to localStorage.
   const [theme, setTheme] = useState<AppTheme>(() => {
     try {
       return localStorage.getItem('smailwolf_m3pro_theme_v1') === 'dark' ? 'dark' : 'light';
@@ -164,18 +171,18 @@ export function MouseProvider({ children }: { children: ReactNode }): React.JSX.
   const toggleTheme = useCallback(() => {
     setTheme((t) => (t === 'dark' ? 'light' : 'dark'));
   }, []);
-  // Áp theme lên <html data-theme> để CSS token + shim dark-mode ăn theo;
-  // lưu lựa chọn để mở lại vẫn giữ.
+  // Apply the theme to <html data-theme> so CSS tokens + the dark-mode shim follow;
+  // save the choice so it persists across restarts.
   useEffect(() => {
     document.documentElement.dataset.theme = theme;
     try {
       localStorage.setItem('smailwolf_m3pro_theme_v1', theme);
     } catch {
-      /* storage khóa — theme vẫn đổi trong phiên */
+      /* storage locked — theme still changes for this session */
     }
   }, [theme]);
-  // W4 (v3.0.8): Chế độ nhẹ — mặc định TẮT, nhớ lựa chọn vào localStorage.
-  // Áp class `lite` lên <html> để CSS tắt blur nền (xem cuối index.css).
+  // W4 (v3.0.8): Lite mode — OFF by default, choice saved to localStorage.
+  // Apply the `lite` class to <html> so CSS turns off background blur (see end of index.css).
   const [lite, setLite] = useState<boolean>(() => {
     try {
       return localStorage.getItem('smailwolf_m3pro_lite_v1') === '1';
@@ -191,12 +198,17 @@ export function MouseProvider({ children }: { children: ReactNode }): React.JSX.
     try {
       localStorage.setItem('smailwolf_m3pro_lite_v1', lite ? '1' : '0');
     } catch {
-      /* storage khóa — lite vẫn đổi trong phiên */
+      /* storage locked — lite still changes for this session */
     }
   }, [lite]);
   const [busy, setBusy] = useState(false);
   const [wired, setWired] = useState(false);
-  const [deviceLabel, setDeviceLabel] = useState('chưa kết nối');
+  // Redesign 2026-11-19 (d): the cable is plugged in (mouse charging) even when
+  // the app stays connected over the 2.4G dongle — `wired` alone misses that.
+  // Set by the HID plug/unplug listeners + the 30s poll below; only the battery
+  // engine reads it, never the polling-rate lists (the mouse still talks 2.4G).
+  const [cableCharging, setCableCharging] = useState(false);
+  const [deviceLabel, setDeviceLabel] = useState('not connected');
   const [version, setVersion] = useState('');
   const [mouseName, setMouseName] = useState('');
   const [battery, setBattery] = useState<number | null>(null);
@@ -206,10 +218,10 @@ export function MouseProvider({ children }: { children: ReactNode }): React.JSX.
   const [batteryReads, setBatteryReads] = useState(0);
   const batteryRef = useRef<number | null>(null);
   const batteryFailStreak = useRef(0);
-  // v3.1 — pin mô phỏng (ước tính): state bền vững trong store
+  // v3.1 — simulated battery (estimated): durable state in the store
   // "battery-state-v1" (xem src/lib/battery.ts + src/lib/tauri.ts).
-  // KHÔNG reset về 100%/0% khi khởi động lại: lúc load áp dụng thời gian
-  // thực đã trôi qua kể từ updated_at (loadWithElapsed).
+  // NEVER reset to 100%/0% on restart: on load, apply the time actually
+  // elapsed since updated_at (loadWithElapsed).
   const [simBattery, setSimBattery] = useState<BatteryState | null>(null);
   const simRef = useRef<BatteryState | null>(null);
   const simLoadedRef = useRef(false);
@@ -227,8 +239,8 @@ export function MouseProvider({ children }: { children: ReactNode }): React.JSX.
     void setBatteryState(s);
   }, []);
 
-  // Load 1 lần lúc mở app: đọc state đã lưu, áp dụng thời gian đã trôi
-  // qua (sạc/xả khi app đóng), hiện % ngay — không chờ kết nối chuột.
+  // Load once at app start: read the saved state, apply elapsed time
+  // (charge/drain while the app was closed), show % immediately — no waiting for the mouse.
   useEffect(() => {
     if (simLoadedRef.current) return;
     simLoadedRef.current = true;
@@ -240,7 +252,7 @@ export function MouseProvider({ children }: { children: ReactNode }): React.JSX.
     });
   }, [persistSim]);
 
-  // Lưu lại khi đóng/reload tab (beforeunload) — % không mất khi tắt app.
+  // Save on tab close/reload (beforeunload) — % is not lost when the app closes.
   useEffect(() => {
     const onUnload = (): void => {
       if (simRef.current) void setBatteryState(simRef.current);
@@ -257,8 +269,8 @@ export function MouseProvider({ children }: { children: ReactNode }): React.JSX.
   const [profiles, setProfilesState] = useState<Profile[]>(() => loadProfiles());
   const [dpiListening, setDpiListening] = useState(false);
   const [tab, setTab] = useState<TabId>('keys');
-  // v2.7: skin chuột đang chọn — chỉ là giao diện (không ghi xuống chuột),
-  // lưu localStorage để mở lại vẫn giữ skin.
+  // v2.7: selected mouse skin — UI-only (never written to the mouse),
+  // saved to localStorage so it persists across restarts.
   const [skinId, setSkinIdState] = useState<string>(() => {
     try {
       return localStorage.getItem('smailwolf_m3pro_skin_v1') ?? 'default';
@@ -271,7 +283,7 @@ export function MouseProvider({ children }: { children: ReactNode }): React.JSX.
     try {
       localStorage.setItem('smailwolf_m3pro_skin_v1', id);
     } catch {
-      /* storage đầy/khóa — skin vẫn đổi trong phiên */
+      /* storage full/locked — skin still changes for this session */
     }
   }, []);
 
@@ -279,9 +291,9 @@ export function MouseProvider({ children }: { children: ReactNode }): React.JSX.
   const busyRef = useRef(false);
   const toastId = useRef(0);
 
-  // v2.4: Activity Log ĐÃ XÓA (theo yêu cầu bro) — mọi thông báo giờ là
-  // toast NGẮN ở đầu trang. addLog giữ nguyên tên (nhiều chỗ gọi) nhưng
-  // giờ đẩy 1 toast info ngắn, không lưu danh sách log nữa.
+  // v2.4: Activity Log REMOVED (per Ethan's request) — every notification is now a
+  // SHORT toast at the top of the page. addLog keeps its name (many callers) but
+  // now pushes one short info toast and no longer keeps a log list.
   const addLog = useCallback((text: string) => {
     const id = ++toastId.current;
     setToasts((prev) => [...prev.slice(-2), { id, kind: 'info', text }]);
@@ -317,12 +329,12 @@ export function MouseProvider({ children }: { children: ReactNode }): React.JSX.
         setConfig((prev) => (prev ? { ...prev, dpiIndex: idx } : prev));
         addLog(
           mode === 'demo'
-            ? `Demo (mô phỏng): nút DPI bấm — chuyển sang nấc ${idx + 1}.`
-            : `Nút DPI bấm: chuyển sang nấc ${idx + 1}.`,
+            ? `Demo (simulated): DPI button pressed — moved to stage ${idx + 1}.`
+            : `DPI button pressed: moved to stage ${idx + 1}.`,
         );
       } else if (s.type === 'battery' && s.battery !== undefined) {
-        // Mọi lần đọc pin (lúc kết nối, poll 30s, bấm "Đọc pin ngay", hoặc
-        // chuột tự đẩy report 48) đều đi qua đây: ghi lịch sử 1 chỗ duy nhất.
+        // Every battery read (on connect, 30s poll, "Read battery now" click, or
+        // mouse-pushed report 48) goes through here: history is recorded in one place only.
         const now = ts();
         const prev = batteryRef.current;
         const src = backendRef.current?.kind ?? 'demo';
@@ -344,8 +356,8 @@ export function MouseProvider({ children }: { children: ReactNode }): React.JSX.
         if (prev !== null && prev !== bat) {
           addLog(
             src === 'demo'
-              ? `Demo (mô phỏng): pin ${prev}% → ${bat}% (dữ liệu mẫu).`
-              : `Pin: ${prev}% → ${bat}% (lúc ${now}).`,
+              ? `Demo (simulated): battery ${prev}% → ${bat}% (sample data).`
+              : `Battery: ${prev}% → ${bat}% (at ${now}).`,
           );
         }
       }
@@ -359,8 +371,8 @@ export function MouseProvider({ children }: { children: ReactNode }): React.JSX.
   };
 
   const connect = useCallback(
-    // v2.6: picked = thiết bị cụ thể bro bấm trong danh sách quét
-    // (DevicePicker) — mở đúng thiết bị đó, không quét lại.
+    // v2.6: picked = the specific device Ethan clicked in the scan list
+    // (DevicePicker) — open exactly that device, no re-scan.
     async (nextMode: 'demo' | 'live', picked?: unknown) => {
       if (connecting || busyRef.current) return;
       setConnecting(true);
@@ -368,9 +380,9 @@ export function MouseProvider({ children }: { children: ReactNode }): React.JSX.
         if (backendRef.current?.connected) await backendRef.current.disconnect();
         const backend: MouseBackend = nextMode === 'demo' ? new DemoMouse() : new LiveMouse();
         backend.onStatus = handleStatus;
-        // v2.4: backend.onLog KHÔNG nối vào addLog nữa — onLog sinh ra cho
-        // Activity Log (đã xóa); nối vào thì mỗi lần ghi config lại hiện
-        // 2 toast trùng nhau (1 từ backend, 1 từ pushToast của store).
+        // v2.4: backend.onLog is NO LONGER wired into addLog — onLog was made for the
+        // Activity Log (removed); wiring it in would show 2 duplicate toasts
+        // on every config write (1 from the backend, 1 from the store's pushToast).
         backendRef.current = backend;
         await backend.connect(picked);
         setMode(nextMode);
@@ -378,22 +390,22 @@ export function MouseProvider({ children }: { children: ReactNode }): React.JSX.
         const r = await backend.readAll();
         applyFullRead(r, backend.isWired);
         setConnected(true);
-        // v2.5: vào giao diện BẮT BUỘC load đúng 3 giây (ancient-yak-42,
-        // la bàn ở giữa, các layer sau che mờ hết) rồi UI mới trôi lên.
-        // (v3.0: rút từ 5s xuống 3s.) Toast kết nối đẩy SAU khi load xong
-        // (đẩy trước thì nó chìm sau lớp loading và tự tắt trước khi bro thấy).
+        // v2.5: entering the UI REQUIRES exactly 3 seconds of loading (ancient-yak-42,
+        // compass in the middle, layers behind fully blurred) before the UI rises up.
+        // (v3.0: cut from 5s to 3s.) The connect toast is pushed AFTER loading finishes
+        // (pushed earlier it would sink behind the loading layer and dismiss before Ethan sees it).
         setLoading(true);
         if (loadingTimer.current) clearTimeout(loadingTimer.current);
         loadingTimer.current = setTimeout(() => {
           setLoading(false);
           pushToast(
             'ok',
-            nextMode === 'demo' ? 'Đã bật Demo (mô phỏng) — không phải chuột thật.' : 'Đã kết nối chuột thật.',
+            nextMode === 'demo' ? 'Demo enabled (simulated) — not a real mouse.' : 'Real mouse connected.',
           );
         }, 3000);
       } catch (e) {
         const msg = e instanceof Error ? e.message : String(e);
-        pushToast('err', `Kết nối lỗi: ${msg}`);
+        pushToast('err', `Connection failed: ${msg}`);
       } finally {
         setConnecting(false);
       }
@@ -412,6 +424,7 @@ export function MouseProvider({ children }: { children: ReactNode }): React.JSX.
       setLoading(false);
       backendRef.current = null;
       setConnected(false);
+      setCableCharging(false);
       setConfig(null);
       setKeys(null);
       setConfigRaw([]);
@@ -424,8 +437,8 @@ export function MouseProvider({ children }: { children: ReactNode }): React.JSX.
       batteryFailStreak.current = 0;
       setVersion('');
       setMouseName('');
-      setDeviceLabel('chưa kết nối');
-      addLog('Đã ngắt kết nối.');
+      setDeviceLabel('not connected');
+      addLog('Disconnected.');
     }
   }, [addLog]);
 
@@ -433,24 +446,30 @@ export function MouseProvider({ children }: { children: ReactNode }): React.JSX.
     const b = backendRef.current;
     if (!b?.connected || busyRef.current) return;
     setBusyBoth(true);
+    // Redesign 2026-11-19 (j): reload shows the same picker-style loading — it has
+    // a purpose (the re-read runs behind it, so its length follows the machine /
+    // mouse instead of a blind timer), and when it lifts the UI floats up again
+    // via app-enter, exactly like after connecting.
+    setLoading(true);
     try {
       const r = await b.readAll();
       applyFullRead(r, b.isWired);
-      addLog(mode === 'demo' ? 'Demo (mô phỏng): đã đọc lại toàn bộ (dữ liệu mẫu).' : 'Đã đọc lại toàn bộ từ chuột.');
+      addLog(mode === 'demo' ? 'Demo (simulated): re-read everything (sample data).' : 'Re-read everything from the mouse.');
     } catch (e) {
-      pushToast('err', `Đọc lại lỗi: ${e instanceof Error ? e.message : String(e)}`);
+      pushToast('err', `Re-read failed: ${e instanceof Error ? e.message : String(e)}`);
     } finally {
       setBusyBoth(false);
+      setLoading(false);
     }
   }, [addLog, applyFullRead, pushToast, mode]);
 
-  /** Hỏi pin ngay (nút "Đọc pin ngay"). Giá trị về qua onStatus('battery')
-   *  nên lịch sử + số lần hỏi được ghi ở handleStatus, ở đây chỉ xử lý
-   *  timeout/lỗi: chuột ngủ thì giữ % cũ, log 1 lần rồi im. */
+  /** Ask for the battery now ("Read battery now" button). The value arrives via onStatus('battery')
+   *  so history + ask count are recorded in handleStatus; here only handle
+   *  timeout/errors: if the mouse is asleep keep the old %, log once, then stay quiet. */
   const readBatteryNow = useCallback(async (): Promise<void> => {
     const b = backendRef.current;
     if (!b?.connected) {
-      pushToast('err', 'Chưa kết nối chuột.');
+      pushToast('err', 'Mouse not connected.');
       return;
     }
     try {
@@ -458,59 +477,106 @@ export function MouseProvider({ children }: { children: ReactNode }): React.JSX.
       if (r === null) {
         batteryFailStreak.current += 1;
         if (batteryFailStreak.current === 1) {
-          addLog('Hỏi pin: chuột không trả lời (có thể đang ngủ) — giữ % cũ, sẽ hỏi lại sau.');
+          addLog('Battery ask: mouse did not answer (may be asleep) — keeping old %, will ask again later.');
         }
         return;
       }
       batteryFailStreak.current = 0;
     } catch (e) {
-      addLog(`Hỏi pin lỗi: ${e instanceof Error ? e.message : String(e)}`);
+      addLog(`Battery ask failed: ${e instanceof Error ? e.message : String(e)}`);
     }
   }, [addLog, pushToast]);
 
-  // Poll pin ở chế độ Live: mỗi 30 giây hỏi chuột 1 lần. Chỉ Live mới poll
-  // — Demo giữ nguyên giá trị mẫu (không bịa đường pin tụt).
+  // Battery poll in Live mode: ask the mouse once every 30 seconds. Only Live polls
+  // — Demo keeps its sample value (no fabricated drain curve).
   useEffect(() => {
     if (!connected || mode !== 'live') return undefined;
     const id = setInterval(() => {
       void readBatteryNow();
+      // Redesign 2026-11-19 (d): re-check the cable every poll too — a plug/unplug
+      // event can be missed (e.g. the cable was already in before the app opened).
+      void isWiredDevicePresent().then(setCableCharging);
     }, BATTERY_POLL_MS);
     return () => clearInterval(id);
   }, [connected, mode, readBatteryNow]);
 
-  // v3.1 — engine pin mô phỏng: tick mỗi 1 giây khi đã kết nối, dùng polling
-  // rate HIỆN TẠI từ config live. Demo: dùng rate của demo, giả định xả
-  // qua 2.4G (demo không có dây). Chưa kết nối thì không tick — thời gian
-  // đó được bù bằng loadWithElapsed ở lần mở app sau.
-  // Sạc = cắm dây (VID 43172 → wired=true): pin lên 150 mA. 2.4G: xả.
-  // Lưu: mỗi 10 giây + ngay khi đổi rate/sạc + khi unload (effect trên).
+  // Redesign 2026-11-19 (d): cable plug/unplug while the app runs. navigator.hid
+  // fires connect/disconnect for HID devices as they appear — a wired mouse
+  // (VID 43172) plugging in means the cable is charging the mouse even though
+  // the app's connection stays on the 2.4G dongle. The initial check covers a
+  // cable that was already in when the app opened (no event fires for it).
+  // NOTE: this only ever sets the CHARGING flag — it never touches `connected`
+  // (a pulled dongle leaving the UI "connected" is W3's gap, fixed in W3).
+  useEffect(() => {
+    if (!connected || mode !== 'live' || !('hid' in navigator)) return undefined;
+    const hid = (
+      navigator as Navigator & {
+        hid: {
+          addEventListener?: (t: string, f: (e: { device: { vendorId: number } }) => void) => void;
+          removeEventListener?: (t: string, f: (e: { device: { vendorId: number } }) => void) => void;
+        };
+      }
+    ).hid;
+    // Real Chrome/Edge have these; the sandbox mock HID does not — guard so a
+    // missing listener API can never crash the app (the 30s poll re-check below
+    // still covers the cable in that case).
+    const canListen = typeof hid.addEventListener === 'function' && typeof hid.removeEventListener === 'function';
+    const onPlug = (e: { device: { vendorId: number } }): void => {
+      if (e.device?.vendorId === WIRED_VID) setCableCharging(true);
+    };
+    const onUnplug = (e: { device: { vendorId: number } }): void => {
+      if (e.device?.vendorId === WIRED_VID) setCableCharging(false);
+    };
+    if (canListen) {
+      hid.addEventListener!('connect', onPlug);
+      hid.addEventListener!('disconnect', onUnplug);
+    }
+    void isWiredDevicePresent().then(setCableCharging);
+    return () => {
+      if (canListen) {
+        hid.removeEventListener!('connect', onPlug);
+        hid.removeEventListener!('disconnect', onUnplug);
+      }
+    };
+  }, [connected, mode]);
+
+  // v3.1 — simulated battery engine: ticks every 1 second while connected, using the
+  // CURRENT polling rate from the live config. Demo: uses the demo rate, assumes drain
+  // over 2.4G (demo has no cable). No tick while disconnected — that time
+  // is caught up by loadWithElapsed on the next app start.
+  // Charging = wired connection OR cable plugged in while on 2.4G (cableCharging):
+  // battery rises at 150 mA. 2.4G with no cable: drains.
+  // Save: every 10 seconds + immediately on rate/charge change + on unload (effect above).
   useEffect(() => {
     if (!connected || !simBattery) return undefined;
     const id = setInterval(() => {
       const prev = simRef.current ?? simBattery;
       const hz = config ? rateHz(config.reportRateIndex, wired) : prev.last_polling_rate;
-      const charging = wired;
+      // Redesign 2026-11-19 (d): charging = wired connection OR cable plugged in
+      // while on 2.4G. The cmd-48 charge_flag byte is live-proven always 0, so
+      // the cable's presence is the only signal we have.
+      const charging = wired || cableCharging;
       const prevPct = percentOf(prev);
       let next = charging ? chargeTick(prev, 1) : batteryTick(prev, 1, hz);
       next = { ...next, charging, last_polling_rate: hz };
       const nextPct = percentOf(next);
-      // Pin yếu: chỉ bắn 1 lần mỗi chu kỳ xả khi tụt QUA 20%.
+      // Low battery: fires only once per discharge cycle when dropping BELOW 20%.
       if (shouldNotifyLow(prevPct, nextPct, prev)) {
         next = { ...next, low_notified: true };
         void notifyLowBattery();
       }
-      // Reset cờ khi bắt đầu sạc hoặc pin lên lại trên 25%.
+      // Reset the flag when charging starts or the battery rises back above 25%.
       if (next.low_notified && (charging || nextPct > LOW_RESET_PCT)) {
         next = { ...next, low_notified: false };
       }
       const nowS = Math.floor(Date.now() / 1000);
       const rateChanged = next.last_polling_rate !== prev.last_polling_rate;
       const chargingChanged = next.charging !== prev.charging;
-      // v3.0.2 — LAG FIX: đừng setState mỗi giây. State chính xác vẫn chạy
-      // trong simRef (persist + thông báo pin yếu dùng ref), chỉ re-render
-      // khi giá trị HIỂN THỊ đổi: % 1 số lẻ, mAh 1 số lẻ, sạc/rate/saver.
-      // Ở 125 Hz (3 mA) % lẻ đổi mỗi ~8 phút, mAh lẻ mỗi ~2 phút — thay vì
-      // cả cây component re-render 1 lần/giây trên máy yếu.
+      // v3.0.2 — LAG FIX: don't setState every second. The exact state still runs
+      // inside simRef (persist + low-battery notification use the ref); only re-render
+      // when a DISPLAYED value changes: % with 1 decimal, mAh with 1 decimal, charge/rate/saver.
+      // At 125 Hz (3 mA) the decimal % changes every ~8 min, decimal mAh every ~2 min — instead of
+      // the whole component tree re-rendering once per second on a weak PC.
       const displayChanged =
         percentOfPrecise(next) !== percentOfPrecise(prev) ||
         Math.round(next.remaining_mah * 10) !== Math.round(prev.remaining_mah * 10) ||
@@ -529,19 +595,19 @@ export function MouseProvider({ children }: { children: ReactNode }): React.JSX.
       }
     }, 1000);
     return () => clearInterval(id);
-    // simBattery chỉ để khởi động effect; tick đọc state mới nhất qua ref.
+    // simBattery only starts the effect; the tick reads the latest state via ref.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [connected, config, wired, simBattery !== null]);
+  }, [connected, config, wired, cableCharging, simBattery !== null]);
 
   const saveConfig = useCallback(
     async (next: MouseConfig): Promise<boolean> => {
       const b = backendRef.current;
       if (!b?.connected) {
-        pushToast('err', 'Chưa kết nối chuột.');
+        pushToast('err', 'Mouse not connected.');
         return false;
       }
       if (busyRef.current) {
-        pushToast('info', 'Đang chạy thao tác khác, đợi xong đã.');
+        pushToast('info', 'Another operation is running, please wait.');
         return false;
       }
       setBusyBoth(true);
@@ -551,14 +617,14 @@ export function MouseProvider({ children }: { children: ReactNode }): React.JSX.
         setConfig(reread.config);
         setConfigRaw(reread.configRaw);
         if (res.matched) {
-          pushToast('ok', mode === 'demo' ? 'Demo: đã ghi config (mô phỏng) — khớp 100%.' : 'Đã ghi config — đọc lại khớp 100%.');
+          pushToast('ok', mode === 'demo' ? 'Demo: config saved (simulated).' : 'Config saved.');
           return true;
         }
-        pushToast('err', `Ghi xong nhưng đọc lại lệch: ${res.diff.map((d) => d.field).join(', ')}`);
+        pushToast('err', `Saved but read-back differs: ${res.diff.map((d) => d.field).join(', ')}`);
         return false;
       } catch (e) {
         const msg = e instanceof Error ? e.message : String(e);
-        pushToast('err', `Ghi config lỗi: ${msg}`);
+        pushToast('err', `Failed to save config: ${msg}`);
         return false;
       } finally {
         setBusyBoth(false);
@@ -567,15 +633,15 @@ export function MouseProvider({ children }: { children: ReactNode }): React.JSX.
     [pushToast, mode],
   );
 
-  // v3.1 — Tiết kiệm pin (mục Khác): BẬT = lưu rate/DPI hiện tại rồi ghi
-  // polling 125 Hz + DPI 1600 xuống chuột qua setConfig (đường ghi đã chứng
-  // minh live, không byte lệnh mới); TẮT = khôi phục rate/DPI đã lưu.
-  // Thanh pin chuyển VÀNG (tray popup + chỉ báo trong app) khi saver bật.
+  // v3.1 — Battery saver (More tab): ON = save the current rate/DPI, then write
+  // polling 125 Hz + DPI 1600 to the mouse via setConfig (write path already proven
+  // live, no new command bytes); OFF = restore the saved rate/DPI.
+  // The battery bar turns YELLOW (tray popup + in-app indicator) while saver is on.
   const setBatterySaver = useCallback(
     async (on: boolean): Promise<boolean> => {
       const cur = config;
       if (!cur) {
-        pushToast('err', 'Chưa kết nối chuột.');
+        pushToast('err', 'Mouse not connected.');
         return false;
       }
       const SNAP_KEY = 'battery-saver-snapshot-v1';
@@ -603,7 +669,7 @@ export function MouseProvider({ children }: { children: ReactNode }): React.JSX.
           persistSim(s);
           return s;
         });
-        pushToast('ok', 'Đã bật Tiết kiệm pin: polling 125 Hz, DPI 1600.');
+        pushToast('ok', 'Battery saver on: polling 125 Hz, DPI 1600.');
         return true;
       }
       const raw = await storeGet(SNAP_KEY);
@@ -617,7 +683,7 @@ export function MouseProvider({ children }: { children: ReactNode }): React.JSX.
           const ok = await saveConfig({ ...cur, ...snap });
           if (!ok) return false;
         } catch {
-          pushToast('err', 'Không đọc được cấu hình đã lưu trước khi tiết kiệm pin.');
+          pushToast('err', 'Could not read the config saved before battery saver.');
           return false;
         }
         await storeSet(SNAP_KEY, '');
@@ -628,7 +694,7 @@ export function MouseProvider({ children }: { children: ReactNode }): React.JSX.
         persistSim(s);
         return s;
       });
-      pushToast('ok', 'Đã tắt Tiết kiệm pin — khôi phục polling + DPI cũ.');
+      pushToast('ok', 'Battery saver off — restored previous polling + DPI.');
       return true;
     },
     [config, wired, saveConfig, pushToast, persistSim],
@@ -638,11 +704,11 @@ export function MouseProvider({ children }: { children: ReactNode }): React.JSX.
     async (next: KeyBinding[]): Promise<boolean> => {
       const b = backendRef.current;
       if (!b?.connected) {
-        pushToast('err', 'Chưa kết nối chuột.');
+        pushToast('err', 'Mouse not connected.');
         return false;
       }
       if (busyRef.current) {
-        pushToast('info', 'Đang chạy thao tác khác, đợi xong đã.');
+        pushToast('info', 'Another operation is running, please wait.');
         return false;
       }
       setBusyBoth(true);
@@ -652,14 +718,14 @@ export function MouseProvider({ children }: { children: ReactNode }): React.JSX.
         setKeys(reread.keys);
         setKeysRaw(reread.keysRaw);
         if (res.matched) {
-          pushToast('ok', mode === 'demo' ? 'Demo: đã ghi remap phím (mô phỏng) — khớp 100%.' : 'Đã ghi remap phím — đọc lại khớp 100%.');
+          pushToast('ok', mode === 'demo' ? 'Demo: key remap saved (simulated).' : 'Key remap saved.');
           return true;
         }
-        pushToast('err', `Ghi phím xong nhưng đọc lại lệch: ${res.diff.map((d) => d.field).join(', ')}`);
+        pushToast('err', `Keys saved but read-back differs: ${res.diff.map((d) => d.field).join(', ')}`);
         return false;
       } catch (e) {
         const msg = e instanceof Error ? e.message : String(e);
-        pushToast('err', `Ghi phím lỗi: ${msg}`);
+        pushToast('err', `Failed to save keys: ${msg}`);
         return false;
       } finally {
         setBusyBoth(false);
@@ -672,18 +738,18 @@ export function MouseProvider({ children }: { children: ReactNode }): React.JSX.
     async (slot = 0): Promise<boolean> => {
       const b = backendRef.current;
       if (!b?.connected) {
-        pushToast('err', 'Chưa kết nối chuột.');
+        pushToast('err', 'Mouse not connected.');
         return false;
       }
       if (busyRef.current) return false;
       setBusyBoth(true);
       try {
         await b.writeMacro(macros, slot);
-        pushToast('ok', mode === 'demo' ? `Demo: đã ghi ${macros.length} macro (mô phỏng).` : `Đã ghi ${macros.length} macro xuống chuột.`);
+        pushToast('ok', mode === 'demo' ? `Demo: saved ${macros.length} macros (simulated).` : `Saved ${macros.length} macros to the mouse.`);
         return true;
       } catch (e) {
         const msg = e instanceof Error ? e.message : String(e);
-        pushToast('err', `Ghi macro lỗi: ${msg}`);
+        pushToast('err', `Failed to save macros: ${msg}`);
         return false;
       } finally {
         setBusyBoth(false);
@@ -703,12 +769,12 @@ export function MouseProvider({ children }: { children: ReactNode }): React.JSX.
   const saveProfile = useCallback(
     (name: string) => {
       if (!config || !keys) {
-        pushToast('err', 'Chưa có dữ liệu chuột để lưu profile.');
+        pushToast('err', 'No mouse data to save as a profile.');
         return;
       }
       const p: Profile = {
         name,
-        savedAt: new Date().toLocaleString('vi-VN'),
+        savedAt: new Date().toLocaleString('en-GB'),
         config: JSON.parse(JSON.stringify(config)) as MouseConfig,
         keys: keys.map((k) => ({ type: k.type, code1: k.code1, code2: k.code2, code3: k.code3 })),
       };
@@ -717,7 +783,7 @@ export function MouseProvider({ children }: { children: ReactNode }): React.JSX.
         persistProfiles(next);
         return next;
       });
-      pushToast('ok', `Đã lưu profile "${name}".`);
+      pushToast('ok', `Profile "${name}" saved.`);
     },
     [config, keys, pushToast],
   );
@@ -762,17 +828,28 @@ export function MouseProvider({ children }: { children: ReactNode }): React.JSX.
   const listenDpiPush = useCallback(() => {
     if (dpiListening) return;
     setDpiListening(true);
-    addLog('Đang nghe nút DPI trong 30 giây — bấm nút DPI trên chuột vài lần.');
+    addLog('Listening for the DPI button for 30 seconds — press the DPI button on the mouse a few times.');
     setTimeout(() => {
       setDpiListening(false);
-      addLog('Hết 30 giây nghe nút DPI.');
+      addLog('DPI button listening ended (30s).');
     }, 30000);
   }, [addLog, dpiListening]);
 
-  // v1.1: KHÔNG tự kết nối Demo khi mở app. v1.0 tự bật Demo và hiện
-  // "Đã kết nối" dù trình duyệt chưa hề hỏi quyền WebHID — nhìn như bịa
-  // dữ liệu. Giờ app mở ở trạng thái CHƯA KẾT NỐI, bro chọn rõ ràng:
-  // "Dùng thử Demo (mô phỏng)" hoặc "Kết nối chuột thật (WebHID)".
+  // v1.1: do NOT auto-connect Demo on app start. v1.0 auto-enabled Demo and showed
+  // "Connected" even though the browser never asked for WebHID permission — looked fabricated.
+  // data. Now the app opens in the NOT CONNECTED state and Ethan chooses explicitly:
+  // v3.0.9 — shared update starter: the AppUpdateGate owns the download →
+  // progress → wipe flow; the Firmware section's Update button just opens
+  // that same flow instead of running its own copy.
+  const updateStarterRef = useRef<(() => void) | null>(null);
+  const registerUpdateStarter = useCallback((fn: (() => void) | null) => {
+    updateStarterRef.current = fn;
+  }, []);
+  const startAppUpdate = useCallback(() => {
+    updateStarterRef.current?.();
+  }, []);
+
+  // "Try the Demo (simulated)" or "Connect a real mouse (WebHID)".
   const value = useMemo<MouseStore>(
     () => ({
       mode, connected, connecting, loading, theme, toggleTheme, lite, toggleLite, busy, wired, deviceLabel, version, mouseName,
@@ -780,6 +857,7 @@ export function MouseProvider({ children }: { children: ReactNode }): React.JSX.
       simPct, simPctPrecise, simCharging, simSaver, simRemainingMah, simPollingHz, setBatterySaver,
       config, keys, configRaw, keysRaw, toasts,
       macros, profiles, dpiListening, tab, setTab, skinId, setSkinId, connect, disconnect, refresh,
+      registerUpdateStarter, startAppUpdate,
       readBatteryNow,
       saveConfig, saveKeys, writeMacros, setMacros, saveProfile, applyProfile,
       deleteProfile, restoreFactory, simulateDpiPush, listenDpiPush, addLog, dismissToast,
@@ -790,6 +868,7 @@ export function MouseProvider({ children }: { children: ReactNode }): React.JSX.
       simPct, simPctPrecise, simCharging, simSaver, simRemainingMah, simPollingHz, setBatterySaver,
       config, keys, configRaw, keysRaw, toasts,
       macros, profiles, dpiListening, tab, skinId, setSkinId, connect, disconnect, refresh,
+      registerUpdateStarter, startAppUpdate,
       readBatteryNow,
       saveConfig, saveKeys, writeMacros, setMacros, saveProfile, applyProfile,
       deleteProfile, restoreFactory, simulateDpiPush, listenDpiPush, addLog, dismissToast,
