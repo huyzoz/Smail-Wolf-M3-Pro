@@ -6,16 +6,16 @@
  */
 import { motion, AnimatePresence } from 'framer-motion';
 import { createPortal } from 'react-dom';
-import { Power } from 'lucide-react';
+import { Power, X } from 'lucide-react';
 import type { ReactNode } from 'react';
 import { useEffect } from 'react';
 import { useMouse } from '../store';
 
-// --- Khóa lướt nền khi popup mở (v2.5, theo yêu cầu bro): popup nào hiện
-// lên che đen đằng sau cũng phải cố định 1 chỗ, nền sau CẤM lướt. Khóa cả
-// body (mobile cuộn trang) lẫn khung cuộn trong panel trái (desktop cuộn
-// trong panel) — popup fixed vẫn hiện đủ khung, nội dung popup tự cuộn
-// riêng (max-h + overflow-y-auto của nó không bị khóa).
+// --- Lock background scrolling while a popup is open (v2.5, per Ethan's request): whichever popup
+// appears and blacks out the background must stay fixed in place, the background behind MUST NOT scroll. Locks both
+// the body (mobile page scroll) and the scroll frame inside the left panel (desktop scrolls
+// inside the panel) — a fixed popup still shows its full frame, the popup's own content scrolls
+// separately (its own max-h + overflow-y-auto are not locked).
 export function useScrollLock(active: boolean): void {
   useEffect(() => {
     if (!active) return;
@@ -32,10 +32,10 @@ export function useScrollLock(active: boolean): void {
   }, [active]);
 }
 
-// --- Mũi tên 3 chevron của shy-moth-10 (Uiverse Li-Deheng, v2.5): SVG gốc
-// thu nhỏ, id (#arrow-icon-*) đổi thành class (.uiv-shy-a1/a2/a3) để dùng
-// nhiều nút trên 1 trang không trùng id. Màu fill = currentColor (trắng
-// trên nút cam, xám trên nút chưa chọn); hover nhấp nháy về màu nền nút
+// --- 3-chevron arrow of shy-moth-10 (Uiverse Li-Deheng, v2.5): original SVG
+// scaled down, ids (#arrow-icon-*) changed to classes (.uiv-shy-a1/a2/a3) so many buttons
+// on one page don't share ids. Fill color = currentColor (white
+// on orange buttons, gray on unselected buttons); hover blinks back to the button's background color
 // (uiv-shy-color, xem index.css). ---
 export function ShyArrow({ small = false }: { small?: boolean } = {}): React.JSX.Element {
   return (
@@ -129,8 +129,8 @@ export function Toggle({
   onChange: (v: boolean) => void;
   label: string;
   disabled?: boolean;
-  /** compact: bỏ min-h 44px, chữ nhỏ — để nhét công tắc vào 1 hàng
-      (Hiệu năng v2.4: "Never sleep" nằm chung hàng tiêu đề Ngủ đông). */
+  /** compact: drops the 44px min-height, smaller text — to fit the switch on one row
+      (Performance v2.4: "Never sleep" shares the Sleep heading row). */
   compact?: boolean;
 }): React.JSX.Element {
   return (
@@ -180,11 +180,11 @@ export function PowerSwitch({
   );
 }
 
-// --- Segmented control (v2.5: shy-moth-10 thay viền xoay serious-monkey-58)
-// Nút đang chọn = pill cam + chữ trắng + mũi tên 3 chevron; nút chưa chọn
-// = pill tối + chữ xám. Hover: outline pulse + mũi tên trượt + chevron
-// nhấp nháy (cơ chế shy-moth-10 nguyên văn, xem index.css .uiv-shy-btn).
-// Tag (P1…/正向…) giữ nguyên, đổi màu theo trạng thái chọn. ---
+// --- Segmented control (v2.5: shy-moth-10 replaces the serious-monkey-58 rotating border)
+// Selected button = orange pill + white text + 3-chevron arrow; unselected button
+// = dark pill + gray text. Hover: outline pulse + sliding arrow + chevron
+// blinking (verbatim shy-moth-10 mechanism, see index.css .uiv-shy-btn).
+// Tags (P1…/正向…) stay as-is, color changes with selection state. ---
 export function SegmentedControl<T extends string | number>({
   options,
   value,
@@ -262,7 +262,7 @@ export function Slider({
   );
 }
 
-// --- Dark panel card (inside the navy left frame, ảnh 3) ---
+// --- Dark panel card (inside the navy left frame, image 3) ---
 export function GlassCard({
   children,
   className = '',
@@ -272,8 +272,8 @@ export function GlassCard({
   children: ReactNode;
   className?: string;
   hover?: boolean;
-  /** compact: padding 10px thay vì 20px — để trang Hiệu năng vừa khung
-      không cần lướt ở 1366x768 (v2.4). */
+  /** compact: 10px padding instead of 20px — so the Performance page fits the frame
+      without scrolling at 1366x768 (v2.4). */
   compact?: boolean;
 }): React.JSX.Element {
   return (
@@ -308,7 +308,7 @@ export function Donut({
   size?: number;
   label: string;
   sub?: string;
-  /** v3.1: màu vòng — vàng (#eab308) khi Tiết kiệm pin bật. */
+  /** v3.1: ring color — yellow (#eab308) when Battery saver is on. */
   accent?: string;
 }): React.JSX.Element {
   const r = (size - 16) / 2;
@@ -344,15 +344,15 @@ export function Donut({
   );
 }
 
-// --- Toasts v2.4 (Uiverse empty-wolverine-58, Cybercom682 — NGUYÊN VĂN) ---
-// Activity Log ĐÃ XÓA — mọi thông báo giờ là toast NGẮN ở ĐẦU trang.
+// --- Toasts v2.4 (Uiverse empty-wolverine-58, Cybercom682 — VERBATIM) ---
+// Activity Log REMOVED — every notification is now a SHORT toast at the TOP of the page.
 // Banner verbatim: border-l-4 + rounded-lg + flex items-center +
 // transition duration-300 ease-in-out + hover:bg-…-200 + hover:scale-105,
-// icon "i" tròn h-5 w-5, chữ text-xs font-semibold. Màu theo kind:
-// ok = xanh lá, info = xanh dương, err = đỏ. (Bỏ biến thể dark: của gốc
-// vì app không dùng class dark của Tailwind; nền pastel sáng hợp nền giấy.)
-// Vào/ra: framer-motion trượt từ trên xuống + fade (chỉ transform/opacity,
-// rẻ GPU) — bản gốc không có animation tự chạy, chỉ có hover scale.
+// round "i" icon h-5 w-5, text-xs font-semibold text. Color by kind:
+// ok = green, info = blue, err = red. (Dropped the dark variant: the original's
+// because the app doesn't use Tailwind's dark class; the light pastel background fits the paper background.)
+// Enter/exit: framer-motion slides down from the top + fade (transform/opacity only,
+// cheap on GPU) — the original has no self-running animation, only hover scale.
 export function Toasts(): React.JSX.Element {
   const { toasts } = useMouse();
   return (
@@ -451,12 +451,12 @@ export function ConfirmModal({
   onCancel: () => void;
   danger?: boolean;
 }): React.JSX.Element | null {
-  // v2.5: modal mở thì khóa lướt nền (body + khung cuộn panel) — popup
-  // cố định 1 chỗ, người dùng xem + tương tác trọn vẹn khung đó.
-  // v2.6: PORTAL ra document.body — Shell có class .app-enter giữ
-  // transform: translateY(0) (animation fill both), transform trên tổ tiên
-  // làm fixed inset-0 chỉ phủ đúng khung Shell (max-w 1440, 2 mép ngoài
-  // không mờ — đúng lỗi bro chụp). Portal thì phủ toàn viewport.
+  // v2.5: an open modal locks background scrolling (body + panel scroll frame) — the popup
+  // stays fixed in place so the user sees + interacts with that whole frame.
+  // v2.6: PORTAL to document.body — the Shell has the .app-enter class holding
+  // transform: translateY(0) (animation fill both); a transform on an ancestor
+  // makes fixed inset-0 cover only the Shell frame (max-w 1440, the 2 outer edges
+  // unblurred — exactly the bug Ethan screenshotted). A portal covers the whole viewport.
   useScrollLock(open);
   if (!open) return null;
   return createPortal(
@@ -477,7 +477,7 @@ export function ConfirmModal({
         <div className="mt-3 text-sm leading-relaxed text-[#c9c9d6]">{children}</div>
         <div className="mt-6 flex justify-end gap-3">
           <GlassButton variant="ghost" onClick={onCancel}>
-            Hủy
+            Cancel
           </GlassButton>
           <GlassButton variant={danger ? 'danger' : 'primary'} onClick={onConfirm}>
             {confirmLabel}
@@ -490,9 +490,9 @@ export function ConfirmModal({
 }
 
 // --- Slide-up confirm modal (v3.0.4, update confirm) ---
-// Giống ConfirmModal nhưng panel TRƯỢT LÊN từ giữa màn hình (y: 24 -> 0)
-// thay vì scale — dùng cho xác nhận cập nhật: "Bạn có muốn cập nhật lên
-// v... không?" + dòng ghi phiên bản cũ sẽ được gỡ, thay bằng bản mới.
+// Like ConfirmModal, but the panel SLIDES UP from the middle of the screen (y: 24 -> 0)
+// instead of scaling — used for the update confirmation: "Do you want to update to
+// v...?" + the line saying the old version will be removed and replaced by the new one.
 export function SlideUpConfirmModal({
   open,
   title,
@@ -512,7 +512,7 @@ export function SlideUpConfirmModal({
   onCancel: () => void;
   /** v3.0.6 — disable the confirm button while an update is downloading. */
   confirmDisabled?: boolean;
-  /** v3.0.6 — optional third action on the left (e.g. "Mở trên GitHub" on error). */
+  /** v3.0.6 — optional third action on the left (e.g. "Open on GitHub" on error). */
   extraActionLabel?: string;
   onExtraAction?: () => void;
 }): React.JSX.Element | null {
@@ -542,7 +542,7 @@ export function SlideUpConfirmModal({
             </GlassButton>
           ) : undefined}
           <GlassButton variant="ghost" onClick={onCancel}>
-            Hủy
+            Cancel
           </GlassButton>
           <GlassButton variant="primary" onClick={onConfirm} disabled={confirmDisabled}>
             {confirmLabel}
@@ -554,10 +554,73 @@ export function SlideUpConfirmModal({
   );
 }
 
+// --- Wide info modal (redesign 2026-11-19, "What's new?" release-notes popup) ---
+// Like ConfirmModal (portal + scroll lock + backdrop + click-outside to close),
+// but LANDSCAPE: max-w-3xl wide, content scrolls internally (max-h 80vh) so a
+// long release log never overflows the viewport.
+export function WideModal({
+  open,
+  title,
+  children,
+  onClose,
+  closable = true,
+}: {
+  open: boolean;
+  title: string;
+  children: ReactNode;
+  onClose: () => void;
+  /** False hides the X + Close button and ignores backdrop clicks — for
+      flows that must not be dismissed halfway (e.g. an update download). */
+  closable?: boolean;
+}): React.JSX.Element | null {
+  useScrollLock(open);
+  if (!open) return null;
+  return createPortal(
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm"
+      role="dialog"
+      aria-modal="true"
+      aria-label={title}
+      onClick={closable ? onClose : undefined}
+    >
+      <motion.div
+        initial={{ opacity: 0, y: 24 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.22, ease: 'easeOut' }}
+        className="panel-card flex max-h-[80vh] w-full max-w-3xl flex-col p-6"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex shrink-0 items-start justify-between gap-3">
+          <h3 className="min-w-0 text-lg font-bold text-[#edebe6]">{title}</h3>
+          {closable && (
+            <button
+              type="button"
+              onClick={onClose}
+              aria-label="Close"
+              className="flex h-[44px] w-[44px] shrink-0 items-center justify-center rounded-xl border border-white/10 bg-white/5 text-[#edebe6] transition hover:bg-white/10"
+            >
+              <X className="h-5 w-5" />
+            </button>
+          )}
+        </div>
+        <div className="mt-3 min-h-0 flex-1 overflow-y-auto text-sm leading-relaxed text-[#c9c9d6]">{children}</div>
+        {closable && (
+          <div className="mt-6 flex shrink-0 justify-end">
+            <GlassButton variant="ghost" onClick={onClose}>
+              Close
+            </GlassButton>
+          </div>
+        )}
+      </motion.div>
+    </div>,
+    document.body,
+  );
+}
+
 // --- Square snake loader (Uiverse grumpy-stingray-26, dark bg only) ---
 export function SnakeLoader({ label }: { label?: string }): React.JSX.Element {
   return (
-    <div className="flex items-center gap-3" role="status" aria-label={label ?? 'Đang tải'}>
+    <div className="flex items-center gap-3" role="status" aria-label={label ?? 'Loading'}>
       <div className="uiv-snake" aria-hidden="true">
         {Array.from({ length: 7 }).map((_, i) => (
           <div key={i} className="uiv-snake-square" />
@@ -568,7 +631,7 @@ export function SnakeLoader({ label }: { label?: string }): React.JSX.Element {
   );
 }
 
-// --- Bottom marquee strip (ảnh 1) ---
+// --- Bottom marquee strip (image 1) ---
 export function Marquee({ items }: { items: string[] }): React.JSX.Element {
   const row = items.join('  •  ');
   return (

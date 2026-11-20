@@ -6,9 +6,9 @@
  * store every 1 s and applies elapsed time in-memory (display only, no
  * writes) so the % keeps moving even while this popup is open.
  *
- * v3.1: real simulated % (see src/lib/battery.ts) + "ước tính" label.
+ * v3.1: real simulated % (see src/lib/battery.ts) + "estimated" label.
  * Yellow bar when battery saver is on. Layout unchanged: iOS-style bar
- * with % inside, "Mở giao diện" / separator / "Thoát chương trình".
+ * with % inside, "Open interface" / separator / "Quit app".
  *
  * Design: navy #17172B + paper text + orange #EA580C (design system tokens
  * from index.css). 44px touch targets, real press feedback (150ms, never
@@ -55,16 +55,16 @@ export default function TrayPopupPage() {
   const hz = state?.last_polling_rate ?? 125;
   const rateLine = state
     ? charging
-      ? `Đang sạc +150 mA · ${state.remaining_mah.toFixed(1)} mAh`
-      : `−${drainMaAt(hz)} mA · ${state.remaining_mah.toFixed(1)} mAh còn lại · ≈${Math.round(runtimeHours(hz) * (pct / 100))} giờ`
-    : 'Chưa có dữ liệu pin — hiển thị 100% mặc định';
+      ? `Charging +150 mA · ${state.remaining_mah.toFixed(1)} mAh`
+      : `−${drainMaAt(hz)} mA · ${state.remaining_mah.toFixed(1)} mAh left · ≈${Math.round(runtimeHours(hz) * (pct / 100))} h`
+    : 'No battery data yet — showing the default 100%';
 
   return (
     <div
       className="flex h-screen w-screen flex-col justify-between p-3"
       style={{ background: 'var(--navy)', color: 'var(--paper-on-navy)' }}
       role="dialog"
-      aria-label="SMAILWOLF M3 Pro — pin chuột"
+      aria-label="SMAILWOLF M3 Pro — mouse battery"
     >
       {/* Header */}
       <div className="flex items-center justify-between">
@@ -78,11 +78,11 @@ export default function TrayPopupPage() {
             color: '#ffffff',
           }}
         >
-          {charging ? 'Đang sạc' : low ? 'Pin yếu' : saver ? 'Tiết kiệm pin' : 'Pin chuột'}
+          {charging ? 'Charging' : low ? 'Low battery' : saver ? 'Battery saver' : 'Mouse battery'}
         </span>
       </div>
 
-      {/* iOS-style battery bar — % INSIDE the bar (1 số lẻ để thấy pin tụt) */}
+      {/* iOS-style battery bar — % INSIDE the bar (1 decimal so you can see the battery drop) */}
       <div className="flex flex-col gap-1.5">
         <div
           className="relative h-10 w-full overflow-hidden rounded-xl border-2"
@@ -91,7 +91,7 @@ export default function TrayPopupPage() {
           aria-valuenow={pctInt}
           aria-valuemin={0}
           aria-valuemax={100}
-          aria-label={`Pin chuột ${pct.toFixed(1)} phần trăm (ước tính)`}
+          aria-label={`Mouse battery ${pct.toFixed(1)} percent (estimated)`}
         >
           <div
             className="h-full transition-[width] duration-300 ease-out motion-reduce:transition-none"
@@ -105,7 +105,7 @@ export default function TrayPopupPage() {
           </span>
         </div>
         <p className="text-center text-xs" style={{ color: 'var(--muted-on-navy)' }}>
-          {rateLine} · ước tính
+          {rateLine} · estimated
         </p>
       </div>
 
@@ -117,7 +117,7 @@ export default function TrayPopupPage() {
           className="font-display min-h-[44px] w-full rounded-xl text-base font-semibold tracking-wide transition-transform duration-150 ease-out active:scale-[0.98] motion-reduce:transition-none"
           style={{ background: 'var(--accent)', color: '#ffffff' }}
         >
-          Mở giao diện
+          Open interface
         </button>
         <div
           className="mx-2 h-px"
@@ -130,7 +130,7 @@ export default function TrayPopupPage() {
           className="min-h-[44px] w-full rounded-xl text-base font-medium transition-transform duration-150 ease-out active:scale-[0.98] motion-reduce:transition-none"
           style={{ background: 'var(--navy-3)', color: 'var(--paper-on-navy)' }}
         >
-          Thoát chương trình
+          Quit app
         </button>
       </div>
     </div>
