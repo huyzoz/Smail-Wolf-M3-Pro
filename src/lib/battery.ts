@@ -1,10 +1,10 @@
 /**
- * Pin (mô phỏng) — src/lib/battery.ts
+ * Battery (simulated) — src/lib/battery.ts
  *
  * PURE logic, no UI, no storage, no HID. The firmware reports only a
  * coarse 100%-until-low value (report 48) and the mouse has NO fuel-gauge
  * chip — the LED is the only true indicator. So the % shown anywhere in
- * this app is an HONEST ESTIMATE, always labelled "ước tính", never
+ * this app is an HONEST ESTIMATE, always labelled "estimated", never
  * presented as a hardware reading.
  *
  * Model (from the measured protocol + Ethan's live readings):
@@ -162,7 +162,7 @@ export function chargeTick(state: BatteryState, seconds: number): BatteryState {
  *   assumption: the app cannot know whether the cable stayed plugged in
  *   while it was closed; it only knows the mouse was wired when it last
  *   ran. If the cable was unplugged, the % will read high until the next
- *   drain catches up — the "ước tính" label is there for exactly this.
+ *   drain catches up — the "estimated" label is there for exactly this.
  * - discharging → sleep-aware drain: the mouse sleeps after `sleepMinutes`
  *   of no input, so only the first `sleepMinutes` drain at
  *   `last_polling_rate`; the rest drains at SLEEP_MA. `sleepMinutes` <= 0

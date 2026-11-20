@@ -95,22 +95,22 @@ export function demoInitialKeys(): KeyBinding[] {
   ];
 }
 
-/** Hỏi pin mỗi bao lâu ở chế độ Live (ms). Lệnh pin chỉ 64 byte, đi qua
- *  serial queue nên 30 giây là nhẹ — đủ để thấy pin tụt theo thời gian thực
- *  mà không làm phiền các lệnh khác. */
+/** How often to ask for the battery in Live mode (ms). The battery command is only 64 bytes and goes through
+ *  the serial queue, so 30 seconds is light — enough to see the battery drop in real time
+ *  without bothering other commands. */
 export const BATTERY_POLL_MS = 30000;
 
-/** Một lần đọc pin, ghi lại để vẽ lịch sử. */
+/** One battery read, recorded for the history chart. */
 export interface BatteryHistoryEntry {
-  time: string; // HH:MM:SS lúc đọc
-  battery: number; // % chuột báo (byte 7 của report 48, hiện trực tiếp)
-  chargeFlag: number; // 0 = không sạc, 1 = đang sạc
+  time: string; // HH:MM:SS at read time
+  battery: number; // % the mouse reports (byte 7 of report 48, shown directly)
+  chargeFlag: number; // 0 = not charging, 1 = charging
   source: 'live' | 'demo';
 }
 
-/** Thêm 1 lần đọc vào lịch sử. Chỉ ghi khi giá trị ĐỔI (pin hoặc trạng
- *  thái sạc) hoặc chưa có gì — hỏi lại 30 giây mà pin không đổi thì không
- *  spam lịch sử; số lần hỏi vẫn đếm riêng ở store. Giữ tối đa `max` mục. */
+/** Add one read to the history. Only record when the value CHANGES (battery or charge
+ *  state) or when there's nothing yet — asking again after 30 seconds with no change doesn't
+ *  spam the history; the ask count is still tracked separately in the store. Keeps at most `max` entries. */
 export function appendBatteryHistory(
   prev: BatteryHistoryEntry[],
   next: BatteryHistoryEntry,
@@ -169,7 +169,7 @@ export class DemoMouse implements MouseBackend {
   kind = 'demo' as const;
   connected = false;
   isWired = false;
-  label = 'Chuột demo (mô phỏng)';
+  label = 'Demo mouse (simulated)';
   onStatus: (s: StatusEvent) => void = () => {};
   onLog: (line: string) => void = () => {};
 
@@ -182,7 +182,7 @@ export class DemoMouse implements MouseBackend {
   async connect(): Promise<void> {
     await sleep(350);
     this.connected = true;
-    this.onLog('Demo: đã kết nối chuột mô phỏng (trạng thái live 20:59:13 của bro).');
+    this.onLog('Demo: simulated mouse connected (live state 20:59:13 from Ethan).');
   }
 
   async disconnect(): Promise<void> {
@@ -208,8 +208,8 @@ export class DemoMouse implements MouseBackend {
     await sleep(420);
     const { config, raw: configRaw } = this.synthConfig();
     const { keys, raw: keysRaw } = this.synthKeys();
-    // Demo cũng đi qua onStatus('battery') như chuột thật (report 48 về
-    // qua inputreport) để store ghi lịch sử pin theo đúng 1 đường duy nhất.
+    // Demo also goes through onStatus('battery') like the real mouse (report 48 arrives
+    // via inputreport) so the store records battery history through exactly one path.
     this.onStatus({ type: 'battery', battery: this.battery, chargeFlag: 0 });
     return {
       version: this.version,
@@ -244,7 +244,7 @@ export class DemoMouse implements MouseBackend {
     diff: ReturnType<typeof diffConfigFields>;
   }> {
     const bytes = buildSetConfig(cfg);
-    if (!bytes) throw new Error('Không ghi được: config fallback hoặc checksum SAI');
+    if (!bytes) throw new Error('Write failed: config fallback or checksum BAD');
     await sleep(260);
     // Apply the write the way the mouse would: rebuild state from the
     // sent bytes (same layout the live mouse stores).
@@ -258,7 +258,7 @@ export class DemoMouse implements MouseBackend {
     this.config = next;
     const after = await this.readConfigKeys();
     const diff = diffConfigFields(cfg, after.config);
-    this.onLog(`Demo: đã ghi config, đọc lại khớp ${diff.length === 0 ? '100%' : `lệch ${diff.length} field`}.`);
+    this.onLog(`Demo: config ${diff.length === 0 ? 'saved' : `saved but differs in ${diff.length} fields`}.`);
     return { sent: bytes, matched: diff.length === 0, diff };
   }
 
@@ -278,7 +278,7 @@ export class DemoMouse implements MouseBackend {
   async writeMacro(macros: MacroDef[], slot = 0): Promise<{ sent: number[][] }> {
     await sleep(300);
     const cmds = buildMacroCommands(macros, slot);
-    this.onLog(`Demo: đã ghi ${macros.length} macro (slot ${slot}, ${cmds.length} lệnh gồm commit) — macro không đọc lại được từ chuột.`);
+    this.onLog(`Demo: wrote ${macros.length} macros (slot ${slot}, ${cmds.length} commands incl. commit) — macros cannot be read back from the mouse.`);
     return { sent: cmds };
   }
 

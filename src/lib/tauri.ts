@@ -115,7 +115,7 @@ export function batteryPercentPrecise(state: BatteryState | null): number {
 
 // ---------------------------------------------------------------------------
 // Native notification — Rust command: notify_low_battery() -> ()
-// Fires the Windows notification "Chuột của bạn còn 20% pin, vui lòng sạc pin".
+// Fires the Windows notification "Your mouse has 20% battery left, please charge it".
 // Called by the battery workstream, not by UI code directly.
 // ---------------------------------------------------------------------------
 
@@ -128,13 +128,13 @@ export async function notifyLowBattery(): Promise<void> {
 // Tray actions — Rust commands: tray_show_main() -> (), tray_quit() -> ()
 // ---------------------------------------------------------------------------
 
-/** Show + focus the main window (tray left-click / "Mở giao diện"). */
+/** Show + focus the main window (tray left-click / "Open interface"). */
 export async function trayShowMain(): Promise<void> {
   if (!isTauri()) return;
   await invoke('tray_show_main');
 }
 
-/** Quit the whole app ("Thoát chương trình"). */
+/** Quit the whole app ("Quit app"). */
 export async function trayQuit(): Promise<void> {
   if (!isTauri()) return;
   await invoke('tray_quit');

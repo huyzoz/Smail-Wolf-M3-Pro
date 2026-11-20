@@ -3,7 +3,7 @@
  * (test-read.html v3.2 + test-write.html) and PROTOCOL.md.
  *
  * Proven live 2026-11-07 on Ethan's real mouse (2.4G dongle, firmware 2.1.3):
- * - full read sequence, config write round-trip KHỚP 100% (3 runs)
+ * - full read sequence, config write round-trip matched 100% (3 runs)
  * - reply checksum byte[2] = sum(bytes[3..63]) mod 256 (9/9 live replies)
  * - DPI-button report 250, full polling ladder 125/250/500/1000
  *
@@ -132,11 +132,11 @@ export const DEFAULT_KEYS: KeyBinding[] = [
   { type: 33, code1: 85, code2: 0, code3: 0 }, // DPI button (fixed, not remappable)
 ];
 
-export const KEY_LABELS = ['Trái', 'Phải', 'Giữa', 'Lùi', 'Tiến', 'Nút DPI'];
+export const KEY_LABELS = ['Left Button', 'Right Button', 'Middle Button', 'Back Button', 'Forward Button', 'DPI Button'];
 
 // ---------------------------------------------------------------- helpers
 export const hexDump = (arr: number[]): string =>
-  arr.length ? arr.map((b) => b.toString(16).padStart(2, '0')).join(' ') : '(rỗng)';
+  arr.length ? arr.map((b) => b.toString(16).padStart(2, '0')).join(' ') : '(empty)';
 
 const u16le = (lo: number, hi: number): number => (hi << 8) | lo;
 export const clampDpi = (v: number): number =>
@@ -223,13 +223,13 @@ export function keyName(type: number, code1: number, code2: number, code3: numbe
     return name ? `Media: ${name}` : `Consumer (${code1},${code2},${code3})`;
   }
   if (type === 16) {
-    if (code1 === 0 && code2 === 0) return '(trống)';
+    if (code1 === 0 && code2 === 0) return '(empty)';
     const mods = MODS.filter(([bit]) => code1 & bit).map(([, n]) => n);
     const key = KC[code2] || `HID ${code2}`;
     return 'Keyboard: ' + [...mods, key].join('+');
   }
   if (type === 112) return `Macro #${code1} (type ${code3})`;
-  if (type === 0 || type === 255) return '(trống)';
+  if (type === 0 || type === 255) return '(empty)';
   return `type ${type} (${code1},${code2},${code3})`;
 }
 
@@ -335,7 +335,7 @@ export function parseVersion(t: number[]): string {
 }
 
 export function parseMouseInfo(t: number[]): string {
-  if (t[0] !== 82 || t[8] === 0) return '(rỗng)';
+  if (t[0] !== 82 || t[8] === 0) return '(empty)';
   return t
     .slice(8, 32)
     .filter((b) => b !== 0)
@@ -344,7 +344,7 @@ export function parseMouseInfo(t: number[]): string {
 }
 
 export function parseConfig(t: number[]): MouseConfig | { error: string } {
-  if (t[0] !== 14) return { error: `reply[0]=${t[0]} (mong đợi 14)` };
+  if (t[0] !== 14) return { error: `reply[0]=${t[0]} (expected 14)` };
   const cs = verifyChecksum(t);
   const base = {
     checksumOk: cs.ok,
@@ -380,7 +380,7 @@ export function parseConfig(t: number[]): MouseConfig | { error: string } {
 }
 
 export function parseKeys(t: number[]): { keys: ParsedKey[]; extraSlots: number[] } | { error: string } {
-  if (t[0] !== 8) return { error: `reply[0]=${t[0]} (mong đợi 8)` };
+  if (t[0] !== 8) return { error: `reply[0]=${t[0]} (expected 8)` };
   const o = t.slice(7);
   const keys: ParsedKey[] = [];
   for (let i = 0; i < 6; i++) {
@@ -390,24 +390,24 @@ export function parseKeys(t: number[]): { keys: ParsedKey[]; extraSlots: number[
     const code3 = o[4 * i + 3];
     keys.push({ index: i, type, code1, code2, code3, name: keyName(type, code1, code2, code3) });
   }
-  // Reply thực tế chứa thêm 2 slot (byte 31-38): (33,56,1,0) và (33,56,255,0)
+  // The real reply contains 2 extra slots (bytes 31-38): (33,56,1,0) and (33,56,255,0)
   return { keys, extraSlots: t.slice(31, 39) };
 }
 
 export function fieldNameForByte(i: number): string {
   if (i === 0) return 'reply-id (14)';
-  if (i === 2) return 'checksum (tổng byte 3..63 mod 256)';
+  if (i === 2) return 'checksum (sum of bytes 3..63 mod 256)';
   if (i === 8) return 'light_mode';
   if (i === 9) return 'report_rate (wire = index+1)';
   if (i === 10) return 'dpi_count';
   if (i === 11) return 'dpi_index (wire = index+1)';
   if (i >= 12 && i <= 23)
     return `dpi${Math.floor((i - 12) / 2) + 1}_value (${i % 2 === 0 ? 'lo' : 'hi'})`;
-  if (i === 47) return 'scroll_flag (hướng lăn)';
+  if (i === 47) return 'scroll_flag (scroll direction)';
   if (i === 48) return 'lod_value';
   if (i === 49) return 'sensor_flag (bit0: line correction)';
   if (i === 50) return 'key_respond';
-  if (i === 51) return 'sleep_light (phút, 0 = never)';
+  if (i === 51) return 'sleep_light (minutes, 0 = never)';
   if (i === 52) return 'highspeed_mode';
   if (i === 53) return 'byte53 (wakeup/move nibble cao)';
   if (i === 54) return 'byte54 (ghi: wakeup<<4|move)';
@@ -474,8 +474,8 @@ export function diffBytes(
 }
 
 // ---------------------------------------------------------------- builders (write commands, verbatim chunk 515)
-/** setMouseConfigData — PROVEN LIVE (round-trip KHỚP 100%, 3 runs).
- *  Byte 54 ghi lấy từ nibble cao byte 53, KHÔNG phải byte 54 đọc được. */
+/** setMouseConfigData — PROVEN LIVE (round-trip matched 100%, 3 runs).
+ *  The written byte 54 takes the high nibble of byte 53, NOT the read byte 54. */
 export function buildSetConfig(cfg: MouseConfig): number[] | null {
   if (cfg.fallback || !cfg.checksumOk) return null;
   const t = Array(64).fill(0);
@@ -622,7 +622,7 @@ export type HidLike = {
 function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise<T> {
   let timer: ReturnType<typeof setTimeout> | undefined;
   const timeout = new Promise<never>((_, rej) => {
-    timer = setTimeout(() => rej(new Error(`timeout ${ms}ms chờ ${label}`)), ms);
+    timer = setTimeout(() => rej(new Error(`timeout ${ms}ms waiting for ${label}`)), ms);
   });
   return Promise.race([promise, timeout]).finally(() => clearTimeout(timer));
 }
@@ -646,7 +646,7 @@ export class LiveMouse {
     return this.wired;
   }
   get label(): string {
-    return this.device ? `${this.device.productName} (VID ${this.device.vendorId})` : 'chưa kết nối';
+    return this.device ? `${this.device.productName} (VID ${this.device.vendorId})` : 'not connected';
   }
 
   private enqueue<T>(fn: () => Promise<T>): Promise<T> {
@@ -721,7 +721,7 @@ export class LiveMouse {
   }
 
   private async writeCommand(cmd: number[]): Promise<number[]> {
-    if (!this.device) throw new Error('Chưa kết nối chuột');
+    if (!this.device) throw new Error('Mouse not connected');
     const padded = Array(64).fill(0);
     cmd.forEach((b, i) => {
       padded[i] = b;
@@ -738,11 +738,11 @@ export class LiveMouse {
     return this.enqueue(() => this.writeCommand(cmd));
   }
 
-  // v2.6: connect(device?) — DevicePicker quét thật (requestDevice) rồi
-  // bấm vào 1 thiết bị cụ thể trong danh sách thì mở đúng thiết bị đó,
-  // không quét lại / không lấy thiết bị đầu tiên theo VID nữa.
+  // v2.6: connect(device?) — DevicePicker does a real scan (requestDevice), then
+  // clicking one specific device in the list opens exactly that device,
+  // no re-scan / no more taking the first device by VID.
   async connect(picked?: unknown): Promise<HidLike> {
-    if (!('hid' in navigator)) throw new Error('Trình duyệt này không có WebHID. Dùng Chrome/Edge.');
+    if (!('hid' in navigator)) throw new Error('This browser has no WebHID. Use Chrome/Edge.');
     const hid = (navigator as Navigator & { hid: { getDevices(): Promise<HidLike[]>; requestDevice(o: unknown): Promise<HidLike[]> } }).hid;
     let device: HidLike;
     if (picked && typeof picked === 'object' && 'open' in picked) {
@@ -752,10 +752,10 @@ export class LiveMouse {
         d.collections?.some((c) => c.usagePage === 65281 && c.usage === 16),
       );
       if (!devices.length) {
-        this.onLog('Chưa có thiết bị được cấp quyền, mở hộp chọn thiết bị…');
+        this.onLog('No device has been granted permission yet, opening the device picker…');
         devices = await hid.requestDevice({ filters: [HID_FILTER] });
       }
-      if (!devices.length) throw new Error('Không chọn thiết bị nào.');
+      if (!devices.length) throw new Error('No device selected.');
       devices.sort((a, b) => a.vendorId - b.vendorId);
       device = devices[0];
     }
@@ -791,10 +791,10 @@ export class LiveMouse {
     const bat = await batteryP;
     const k = await this.queuedWrite([240, 8, 165, 11, 44, 0, 0, 0, 0, 0]);
     const parsedKeys = parseKeys(k);
-    if ('error' in parsedKeys) throw new Error(`Đọc phím lỗi: ${parsedKeys.error}`);
+    if ('error' in parsedKeys) throw new Error(`Failed to read keys: ${parsedKeys.error}`);
     const t = await this.queuedWrite([240, 14, 165, 11, 46, 1, 1, 1, 0, 0]);
     const cfg = parseConfig(t);
-    if ('error' in cfg) throw new Error(`Đọc config lỗi: ${cfg.error}`);
+    if ('error' in cfg) throw new Error(`Failed to read config: ${cfg.error}`);
     const stP = this.waitStatus('mouse_status');
     await this.queuedWrite([240, 237]);
     const st = await stP;
@@ -840,7 +840,7 @@ export class LiveMouse {
       last = { keys: parsedKeys.keys, keysRaw: k, config: cfg, configRaw: t };
       if (cfg.checksumOk) return last;
     }
-    if (!last) throw new Error('Đọc keys/config lỗi 2 lần liên tiếp');
+    if (!last) throw new Error('Failed to read keys/config twice in a row');
     return last;
   }
 
@@ -852,11 +852,11 @@ export class LiveMouse {
     diff: ReturnType<typeof diffConfigFields>;
   }> {
     const bytes = buildSetConfig(cfg);
-    if (!bytes) throw new Error('Không ghi được: config fallback hoặc checksum SAI');
+    if (!bytes) throw new Error('Write failed: config fallback or checksum BAD');
     const ack = await this.queuedWrite(bytes);
-    if (ack[0] !== 15) throw new Error(`Ack ghi lỗi: reply[0]=${ack[0]} (mong đợi 15)`);
+    if (ack[0] !== 15) throw new Error(`Write ack error: reply[0]=${ack[0]} (expected 15)`);
     const ackCs = verifyChecksum(ack);
-    if (!ackCs.ok) throw new Error(`Checksum ack SAI: reply=${ack[2]}, tính ra=${ackCs.expected}`);
+    if (!ackCs.ok) throw new Error(`Ack checksum BAD: reply=${ack[2]}, expected=${ackCs.expected}`);
     const after = await this.readConfigKeys();
     const diff = diffConfigFields(cfg, after.config);
     return { sent: bytes, matched: diff.length === 0, diff };
@@ -879,5 +879,23 @@ export class LiveMouse {
     const cmds = buildMacroCommands(macros, slot);
     for (const c of cmds) await this.queuedWrite(c);
     return { sent: cmds };
+  }
+}
+
+/** Redesign 2026-11-19 (d): is a WIRED Smailwolf mouse (VID 43172) present among
+    the devices this browser has been granted? A cable charges the mouse even
+    while the app stays connected over the 2.4G dongle — that is the case the old
+    `wired` flag missed. getDevices() only returns GRANTED devices, so this
+    answers true once the wired mouse was ever connected (the grant persists);
+    the plug/unplug event listener in the store covers cables plugged in while
+    the app runs. Never throws — false when WebHID is absent or the call fails. */
+export async function isWiredDevicePresent(): Promise<boolean> {
+  try {
+    if (!('hid' in navigator)) return false;
+    const hid = (navigator as Navigator & { hid: { getDevices(): Promise<HidLike[]> } }).hid;
+    const devices = await hid.getDevices();
+    return devices.some((d) => d.vendorId === WIRED_VID);
+  } catch {
+    return false;
   }
 }

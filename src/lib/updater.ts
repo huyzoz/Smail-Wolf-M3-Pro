@@ -27,7 +27,7 @@ import { openUrl } from '@tauri-apps/plugin-opener';
 export const APP_REPO = 'duyzoz/Smail-Wolf-M3-Pro';
 const LATEST_RELEASE_API = `https://api.github.com/repos/${APP_REPO}/releases/latest`;
 /** Fallback when getVersion() is unavailable (plain browser / dev). Bump with releases. */
-export const FALLBACK_APP_VERSION = '3.0.8';
+export const FALLBACK_APP_VERSION = '3.0.9';
 
 export interface AppUpdateInfo {
   available: boolean;
@@ -64,7 +64,7 @@ export function compareVersions(a: string, b: string): number {
 export function formatReleaseTime(iso: string): string {
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return iso;
-  return new Intl.DateTimeFormat('vi-VN', {
+  return new Intl.DateTimeFormat('en-GB', {
     day: '2-digit',
     month: '2-digit',
     year: 'numeric',
@@ -73,12 +73,12 @@ export function formatReleaseTime(iso: string): string {
   }).format(d);
 }
 
-/** "2026-11-09T01:52:12Z" -> "Thứ Hai, 09/11/2026, 08:52" (local timezone).
- *  Dùng cho popup cập nhật: người dùng thấy rõ "thứ mấy" + giờ phát hành. */
+/** "2026-11-09T01:52:12Z" -> "Monday, 09/11/2026, 08:52" (local timezone).
+ *  Used in the update popup: the user sees clearly which weekday + the release time. */
 export function formatReleaseTimeWithWeekday(iso: string): string {
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return iso;
-  return new Intl.DateTimeFormat('vi-VN', {
+  return new Intl.DateTimeFormat('en-GB', {
     weekday: 'long',
     day: '2-digit',
     month: '2-digit',
@@ -96,7 +96,7 @@ export async function currentAppVersion(): Promise<string> {
   }
 }
 
-/** Release tag của app đang chạy, VD "v3.0.4-rust" — hiện ở thẻ Firmware. */
+/** Release tag of the running app, e.g. "v3.0.4-rust" — shown in the Firmware card. */
 export async function currentAppVersionTag(): Promise<string> {
   return `v${await currentAppVersion()}-rust`;
 }
@@ -167,19 +167,42 @@ export function setupFileName(info: AppUpdateInfo): string {
   return `SMAILWOLF-M3-Pro-Driver_${info.latestVersion}_x64-setup.exe`;
 }
 
-/** Real self-update (v3.0.6): download the newest .setup to %TEMP%,
- *  launch the installer, then quit this process entirely. Runs the Rust
- *  command `install_update` — no browser involved. On success the app
- *  exits, so this promise never resolves; on failure it rejects with a
- *  human-readable Vietnamese message. */
-export async function installUpdate(info: AppUpdateInfo): Promise<void> {
+/** Silent in-client update (v3.0.9, redesign §n): the Rust command
+ *  `download_update` streams the newest .setup into the %LOCALAPPDATA%
+ *  cache IN-PROCESS (reqwest — no curl.exe, no CMD window) and emits
+ *  `update-progress` events while it runs. Resolves with where the
+ *  installer landed; `cached` means the exact version was already on
+ *  disk, so no bytes were downloaded. On failure it rejects with a
+ *  human-readable English message. */
+export interface UpdateDownloaded {
+  path: string;
+  size: number;
+  cached: boolean;
+}
+
+/** One `update-progress` event from Rust while downloading. `total` is 0
+ *  when the server sent no Content-Length. */
+export interface UpdateProgressEvent {
+  downloaded: number;
+  total: number;
+}
+
+export async function downloadUpdate(info: AppUpdateInfo): Promise<UpdateDownloaded> {
   const url = info.setupUrl ?? info.releaseUrl;
-  await invoke('install_update', { url, filename: setupFileName(info) });
+  return await invoke('download_update', { url, filename: setupFileName(info) });
+}
+
+/** Finish the update after the download: wipe the old client data when the
+ *  user confirmed, then launch the new installer and quit this process.
+ *  On success the app exits, so this promise never resolves; on failure it
+ *  rejects with a human-readable English message. */
+export async function finishUpdate(info: AppUpdateInfo, wipe: boolean): Promise<void> {
+  await invoke('finish_update', { filename: setupFileName(info), wipe });
 }
 
 /** Open the setup installer download (falls back to the release page).
- *  Kept as the fallback for "Mở trên GitHub" — the primary update path
- *  is installUpdate() above, which does not depend on the browser. */
+ *  Kept as the fallback for "Open on GitHub" — the primary update path
+ *  is downloadUpdate() above, which does not depend on the browser. */
 export async function openUpdateSetup(info: AppUpdateInfo): Promise<void> {
   const url = info.setupUrl ?? info.releaseUrl;
   try {
@@ -195,5 +218,37 @@ export async function openReleasePage(info: AppUpdateInfo): Promise<void> {
     await openUrl(info.releaseUrl);
   } catch {
     window.open(info.releaseUrl, '_blank', 'noopener,noreferrer');
+  }
+}
+
+/** Open the repo (source code) in the system browser. */
+export async function openRepoPage(): Promise<void> {
+  const url = `https://github.com/${APP_REPO}`;
+  try {
+    await openUrl(url);
+  } catch {
+    window.open(url, '_blank', 'noopener,noreferrer');
+  }
+}
+
+/** Release notes of the CURRENT version, fetched directly by tag.
+ *  Used by the "What's new?" popup when the cached update check has no
+ *  usable result (still checking / offline). Null = could not fetch. */
+export async function fetchCurrentReleaseNotes(): Promise<string | null> {
+  const tag = await currentAppVersionTag();
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), 8000);
+  try {
+    const res = await fetch(`https://api.github.com/repos/${APP_REPO}/releases/tags/${tag}`, {
+      headers: { Accept: 'application/vnd.github+json' },
+      signal: ctrl.signal,
+    });
+    if (!res.ok) return null;
+    const data = (await res.json()) as { body?: string };
+    return data.body ?? '';
+  } catch {
+    return null;
+  } finally {
+    clearTimeout(timer);
   }
 }

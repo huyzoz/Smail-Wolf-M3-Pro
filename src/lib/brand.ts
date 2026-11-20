@@ -1,25 +1,25 @@
 /**
  * brand.ts — logo SMAILWOLF (v3.0).
  *
- * File gốc 4K (4096x1024) giữ trong public/brand/ làm source asset.
- * Trong app chỉ dùng bản downscale 800px (đủ cho hiển thị ~320px,
- * nhẹ ~100KB thay vì ~900KB).
+ * The original 4K file (4096x1024) is kept in public/brand/ as the source asset.
+ * The app only uses the 800px downscale (enough for ~320px display,
+ * ~100KB instead of ~900KB).
  *
- * QUY TẮC CỦA ETHAN — map theo ĐỘ SÁNG CỦA NỀN, KHÔNG theo tên file:
- * - nền TỐI (dark mode / màn loading navy) → file LIGHT (swoosh TRẮNG)
- * - nền SÁNG (light mode) → file DARK (swoosh TỐI)
- * Tên file dễ nhầm ngược (DARK file = swoosh tối, LIGHT file = swoosh
- * trắng) nên hàm này là chỗ duy nhất được phép chọn file.
+ * ETHAN'S RULE — map by BACKGROUND BRIGHTNESS, NOT by file name:
+ * - DARK background (dark mode / navy loading screen) → LIGHT file (WHITE swoosh)
+ * - LIGHT background (light mode) → DARK file (DARK swoosh)
+ * File names are easy to mix up (DARK file = dark swoosh, LIGHT file = white swoosh)
+ * so this function is the only place allowed to pick the file.
  */
 export type AppTheme = 'light' | 'dark';
 
 export const BRAND_DARK_800 = '/brand/SMAILWOLF_DARK_800.png';
 export const BRAND_LIGHT_800 = '/brand/SMAILWOLF_LIGHT_800.png';
 
-/** Logo cho nền sáng/tối theo theme hiện tại. */
+/** Logo for a light/dark background, per the current theme. */
 export function brandLogoSrc(theme: AppTheme): string {
   return theme === 'dark' ? BRAND_LIGHT_800 : BRAND_DARK_800;
 }
 
-/** Logo cho nền navy tối cố định (màn loading) — luôn swoosh trắng. */
+/** Logo for the fixed dark navy background (loading screen) — always the white swoosh. */
 export const BRAND_ON_DARK = BRAND_LIGHT_800;
