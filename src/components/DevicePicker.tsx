@@ -1,23 +1,23 @@
 /**
- * Màn chọn thiết bị v3.0 — redesign: KHUNG QUẢN LÝ trong suốt trên nền
- * lưới ô vuông (giống hệt nền ngoài khung — cùng token --grid-line /
- * --paper của body, ô 56px; trong == ngoài, không còn nền sao tối tách
- * biệt). Khung chỉ là viền + góc bản vẽ, nền trong suốt nên lưới chạy
- * liền mạch qua khung.
- * - Mở màn: navigator.hid.getDevices() liệt kê thiết bị ĐÃ cấp quyền.
- * - Bấm "Thêm thiết bị mới": navigator.hid.requestDevice({filters:
- *   [{usagePage: 0xFF01, usage: 0x10}]}) mở hộp chọn thiết bị của trình
- *   duyệt — chọn xong thiết bị mới hiện vào danh sách. Bấm Hủy trong
- *   dialog thì thôi, không lỗi.
- * - Danh sách = mọi thiết bị Smailwolf quét được (có dây qua VID 43172,
- *   2.4G qua VID 43173/14391). Bấm card là kết nối ĐÚNG thiết bị đó
+ * Device picker v3.0 — redesign: transparent MANAGEMENT FRAME over the
+ * square grid background (identical to the background outside the frame — same --grid-line /
+ * --paper tokens as the body, 56px squares; inside == outside, no more separate dark starry
+ * background). The frame is only a border + blueprint corners, transparent background so the grid runs
+ * seamlessly through the frame.
+ * - On open: navigator.hid.getDevices() lists devices ALREADY granted permission.
+ * - Clicking "Add new device": navigator.hid.requestDevice({filters:
+ *   [{usagePage: 0xFF01, usage: 0x10}]}) opens the browser's device picker
+ *   dialog — once picked, the new device appears in the list. Clicking Cancel in
+ *   the dialog just cancels, no error.
+ * - The list = every Smailwolf device found by scanning (wired via VID 43172,
+ *   2.4G via VID 43173/14391). Clicking a card connects to EXACTLY that device
  *   (store.connect('live', device)).
- * - Demo KHÔNG còn là card thiết bị nữa — chỉ là dòng link nhỏ dưới
- *   danh sách ("Không có chuột ở đây? Dùng thử Demo (mô phỏng)").
- * - PickerFx v3.0: ô vuông lưới gần con trỏ NỔI LÊN theo chuột (canvas,
- *   transform/opacity-only qua vẽ lại, rAF) + hào quang cam đi theo.
- *   Tôn trọng prefers-reduced-motion (tắt hẳn). Blob đỏ kính lỏng toàn
- *   app nằm ở CursorBlob (App root), không phải ở đây.
+ * - Demo is NO LONGER a device card — just a small link line below
+ *   the list ("No mouse here? Try the Demo (simulated)").
+ * - PickerFx v3.0: grid squares near the cursor RISE with the mouse (canvas,
+ *   transform/opacity-only via redraw, rAF) + an orange glow following along.
+ *   Respects prefers-reduced-motion (fully off). The app-wide liquid-glass red blob
+ *   lives in CursorBlob (App root), not here.
  * - Logo = file brand 800px, map theo theme (dark → LIGHT file).
  */
 import { useCallback, useEffect, useRef, useState } from 'react';
@@ -43,15 +43,15 @@ type HidApi = {
 };
 
 function modeLabel(vendorId: number): string {
-  if (vendorId === WIRED_VID) return 'Có dây · USB';
+  if (vendorId === WIRED_VID) return 'Wired · USB';
   if (vendorId === 43173 || vendorId === 14391) return '2.4G · USB Receiver';
   return 'HID · Smailwolf';
 }
 
-/** Nền tương tác (v3.0): ô vuông lưới gần con trỏ nổi lên + hào quang
-    cam đi theo. Canvas phủ đúng khung picker, chỉ vẽ ô nổi + glow
-    (đường lưới nền do CSS .picker-bg vẽ, giống hệt body). rAF,
-    tôn trọng prefers-reduced-motion (tắt hẳn). */
+/** Interactive background (v3.0): grid squares near the cursor rise + an orange glow
+    following along. The canvas covers exactly the picker frame, only drawing raised squares + glow
+    (the background grid lines are drawn by CSS .picker-bg, identical to the body). rAF,
+    respects prefers-reduced-motion (fully off). */
 function PickerFx(): React.JSX.Element {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   useEffect(() => {
@@ -86,8 +86,8 @@ function PickerFx(): React.JSX.Element {
       mx = e.clientX - r.left;
       my = e.clientY - r.top;
       lastMove = performance.now();
-      // v3.0.2 — LAG FIX: vòng rAF dừng khi chuột đứng yên (xem cuối tick);
-      // di chuột lại thì khởi động vòng lặp.
+      // v3.0.2 — LAG FIX: the rAF loop stops when the mouse is idle (see end of tick);
+      // moving the mouse again restarts the loop.
       if (!raf) raf = requestAnimationFrame(tick);
     };
     const onLeave = (): void => {
@@ -108,14 +108,14 @@ function PickerFx(): React.JSX.Element {
         gy = -999;
       }
       if (gx >= 0) {
-        // Hào quang cam mềm đi theo con trỏ.
+        // Soft orange glow following the cursor.
         const g = ctx.createRadialGradient(gx, gy, 0, gx, gy, 220);
         g.addColorStop(0, 'rgba(255,90,31,0.13)');
         g.addColorStop(0.55, 'rgba(255,90,31,0.05)');
         g.addColorStop(1, 'rgba(255,90,31,0)');
         ctx.fillStyle = g;
         ctx.fillRect(gx - 220, gy - 220, 440, 440);
-        // Ô vuông gần con trỏ NỔI LÊN: càng gần càng sáng + nhích lên.
+        // Squares near the cursor RISE: the closer, the brighter + they lift up.
         const R = 120;
         const c0 = Math.max(0, Math.floor((gx - R) / CELL));
         const c1 = Math.min(Math.ceil(w / CELL), Math.ceil((gx + R) / CELL));
@@ -134,8 +134,8 @@ function PickerFx(): React.JSX.Element {
             const y = r * CELL + 3 - lift;
             const s = CELL - 6;
             ctx.save();
-            // v3.0.2 — bỏ shadowBlur (đắt nhất trên iGPU yếu); chỉ fill +
-            // stroke đã đủ hiệu ứng ô vuông nổi lên.
+            // v3.0.2 — removed shadowBlur (most expensive on a weak iGPU); fill +
+            // stroke alone is enough for the rising-square effect.
             ctx.fillStyle = `rgba(234,88,12,${(a * 0.22).toFixed(3)})`;
             ctx.strokeStyle = `rgba(234,88,12,${a.toFixed(3)})`;
             ctx.lineWidth = 1.5;
@@ -148,10 +148,10 @@ function PickerFx(): React.JSX.Element {
           }
         }
       }
-      // v3.0.2 — LAG FIX: dừng vòng rAF khi chuột đứng yên >1.5s. Khung hình
-      // cuối vẫn giữ nguyên trên canvas (hào quang + ô vuông đứng yên) nên
-      // nhìn không đổi, nhưng CPU/iGPU được nghỉ; di chuột lại thì onMove
-      // khởi động vòng lặp.
+      // v3.0.2 — LAG FIX: stop the rAF loop when the mouse is idle for >1.5s. The last
+      // frame stays on the canvas (glow + squares frozen), so it looks
+      // unchanged, but the CPU/iGPU get to rest; moving the mouse again lets onMove
+      // restart the loop.
       if (performance.now() - lastMove < 1500) {
         raf = requestAnimationFrame(tick);
       } else {
@@ -202,7 +202,7 @@ export default function DevicePicker(): React.JSX.Element {
       );
       mergeDevices(found);
     } catch {
-      // Quét lúc mở màn lỗi thì để danh sách trống, bro bấm quét lại.
+      // If the opening scan fails, leave the list empty and let Ethan scan again.
     }
   }, [mergeDevices]);
 
@@ -210,7 +210,7 @@ export default function DevicePicker(): React.JSX.Element {
     void scanGranted();
   }, [scanGranted]);
 
-  // Bấm là mở hộp chọn thiết bị của trình duyệt (dialog HID) — quét thật.
+  // Clicking opens the browser's device picker dialog (HID dialog) — a real scan.
   const scanNew = async (): Promise<void> => {
     setScanning(true);
     try {
@@ -222,7 +222,7 @@ export default function DevicePicker(): React.JSX.Element {
       const picked = await hid.requestDevice({ filters: [HID_FILTER] });
       mergeDevices(picked);
     } catch {
-      // Bấm Hủy trong dialog HID → thôi, không báo lỗi.
+      // Clicking Cancel in the HID dialog → just cancels, no error.
     } finally {
       setScanning(false);
     }
@@ -234,26 +234,26 @@ export default function DevicePicker(): React.JSX.Element {
   return (
     <div className="picker-bg relative flex min-h-dvh flex-col items-center justify-center overflow-hidden px-4 py-8" data-testid="device-picker">
       <PickerFx />
-      {/* Logo brand 800px (map theo theme) — góc trên trái. */}
+      {/* 800px brand logo (mapped by theme) — top-left corner. */}
       <div className="absolute top-6 left-6 z-10">
         <img src={brandLogoSrc(theme)} alt="SMAILWOLF" className="h-9 w-auto" />
       </div>
 
-      {/* KHUNG QUẢN LÝ (v3.0): viền + góc bản vẽ, NỀN TRONG SUỐT — lưới ô
-          vuông ngoài khung chạy liền mạch vào trong (trong == ngoài). */}
+      {/* MANAGEMENT FRAME (v3.0): border + blueprint corners, TRANSPARENT BACKGROUND — the square
+          grid outside the frame runs seamlessly inside (inside == outside). */}
       <div className="relative z-10 flex w-full max-w-2xl flex-col items-center rounded-[28px] border border-[var(--line-paper)] px-6 py-8 shadow-[0_20px_60px_rgba(22,22,26,0.10)] sm:px-10" data-testid="device-frame">
         <span className="pointer-events-none absolute top-3 left-3 h-5 w-5 border-t-2 border-l-2 border-[var(--line-paper)]" aria-hidden="true" />
         <span className="pointer-events-none absolute top-3 right-3 h-5 w-5 border-t-2 border-r-2 border-[var(--line-paper)]" aria-hidden="true" />
         <span className="pointer-events-none absolute bottom-3 left-3 h-5 w-5 border-b-2 border-l-2 border-[var(--line-paper)]" aria-hidden="true" />
         <span className="pointer-events-none absolute right-3 bottom-3 h-5 w-5 border-r-2 border-b-2 border-[var(--line-paper)]" aria-hidden="true" />
         <h1 className="text-center font-display text-2xl font-bold tracking-wide text-[var(--ink)] sm:text-3xl">
-          KẾT NỐI CHUỘT SMAILWOLF
+          CONNECT YOUR SMAILWOLF MOUSE
         </h1>
         <p className="mt-2 text-center text-sm text-[var(--muted-paper)]">
-          Quét rộng — mọi thiết bị Smailwolf đang cắm hoặc đã ghép nối sẽ hiện ở đây. Bấm card để kết nối.
+          Broad scan — every Smailwolf device plugged in or already paired shows up here. Click a card to connect.
         </p>
 
-        {/* Nút "Thêm thiết bị mới" (cam, kiểu app gốc) — bấm để quét thật. */}
+        {/* "Add new device" button (orange, original-app style) — click for a real scan. */}
         <button
           type="button"
           onClick={() => void scanNew()}
@@ -261,21 +261,21 @@ export default function DevicePicker(): React.JSX.Element {
           className="uiv-shy-btn uiv-shy-selected mt-6 px-6 py-3 text-[15px] disabled:opacity-60"
         >
           <Plus className="h-5 w-5" />
-          {scanning ? 'Đang quét…' : 'Thêm thiết bị mới'}
+          {scanning ? 'Scanning…' : 'Add new device'}
           <ShyArrow />
         </button>
 
         <p className="mt-4 text-sm text-[var(--muted-paper)]">
-          {`Tìm thấy ${devices.length} thiết bị`}
-          {!hidSupported ? ' — trình duyệt này không có WebHID, dùng Demo bên dưới.' : ''}
+          {`Found ${devices.length} devices`}
+          {!hidSupported ? ' — this browser has no WebHID, use the Demo below.' : ''}
         </p>
 
-        {/* Danh sách thiết bị QUÉT ĐƯỢC — hiện ĐÚNG PNG chuột anime. */}
+        {/* List of FOUND devices — shows the exact anime mouse PNG. */}
         {devices.length === 0 ? (
           <div className="mt-8 w-full max-w-[240px] rounded-2xl border border-dashed border-[var(--line-paper)] p-5 text-center">
             <img src={skinThumbSrc(skinId)} alt="" className="mx-auto h-28 w-auto opacity-40" />
-            <p className="mt-4 text-sm font-semibold text-[var(--ink)]">Chưa thấy thiết bị nào</p>
-            <p className="mt-1 text-xs text-[var(--muted-paper)]">Cắm chuột / bật dongle rồi bấm “Thêm thiết bị mới” để quét.</p>
+            <p className="mt-4 text-sm font-semibold text-[var(--ink)]">No devices found yet</p>
+            <p className="mt-1 text-xs text-[var(--muted-paper)]">Plug in the mouse / turn on the dongle, then click “Add new device” to scan.</p>
           </div>
         ) : (
           <div className="mt-8 flex flex-col items-center justify-center gap-4 sm:flex-row">
@@ -287,7 +287,7 @@ export default function DevicePicker(): React.JSX.Element {
                   type="button"
                   onClick={() => void connect('live', d)}
                   disabled={connecting}
-                  aria-label={`Kết nối ${name} qua ${modeLabel(d.vendorId)}`}
+                  aria-label={`Connect ${name} via ${modeLabel(d.vendorId)}`}
                   className={cardCls}
                 >
                   <img src={skinThumbSrc(skinId)} alt="" className="h-44 w-auto" />
@@ -301,18 +301,18 @@ export default function DevicePicker(): React.JSX.Element {
           </div>
         )}
 
-        {/* Demo tách riêng khỏi danh sách thiết bị (không phải card quét). */}
+        {/* Demo is separate from the device list (not a scan card). */}
         <button
           type="button"
           onClick={() => void connect('demo')}
           disabled={connecting}
           className="mt-8 text-sm text-[var(--muted-paper)] underline decoration-[var(--line-paper)] underline-offset-4 hover:text-[var(--ink)] disabled:opacity-50"
         >
-          Không có chuột ở đây? Dùng thử Demo (mô phỏng)
+          No mouse here? Try the Demo (simulated)
         </button>
 
         <p className="mt-4 text-xs text-[var(--muted-paper)]">
-          Ngắt kết nối ở giao diện chính để quay lại đây.
+          Disconnect from the main UI to come back here.
         </p>
       </div>
     </div>

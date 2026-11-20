@@ -1,29 +1,42 @@
 /**
- * TopBar v2.5 — theo yêu cầu của bro: CHỈ còn logo + cụm kết nối.
- * - FW + Pin ĐÃ XÓA khỏi topbar (đã có trong 4 dock bên dưới).
- * - Icon chế độ kết nối: Wifi = 2.4G, Cable (ethernet) = dây, Bluetooth =
- *   Bluetooth. (App chỉ tới được chuột qua dây/2.4G bằng WebHID vendor
- *   filter — nhánh Bluetooth để sẵn cho đường BT sau này.)
- * - Nút "Ngắt" hỏi xác nhận: "Bạn có muốn ngắt kết nối với thiết bị
- *   này?" — Đồng ý / Hủy (không ngắt ngay nữa).
- * - v2.5: nút kết nối Demo/Live ĐÃ XÓA khỏi topbar — màn chọn thiết bị
- *   (DevicePicker) lo việc kết nối rồi; vào tới topbar là đã kết nối.
- *   Mọi nhánh "chưa kết nối" trong topbar đều đã dọn.
- * Nav đã xóa từ v2.2, dồn vào menu 4 mục trong panel trái (LeftPanel).
- * Dưới là dải annotation mono kiểu bản vẽ kỹ thuật (chỉ màn ≥1536px).
+ * TopBar v2.5 — per Ethan's request: ONLY the logo + connection cluster remain.
+ * - FW + Battery REMOVED from the topbar (already in the 4 docks below).
+ * - Connection mode icons: Wifi = 2.4G, Cable (ethernet) = wired, Bluetooth =
+ *   Bluetooth. (The app only reaches the mouse via cable/2.4G through the WebHID vendor
+ *   filter — the Bluetooth branch is ready for a future BT path.)
+ * - The "Disconnect" button asks for confirmation: "Do you want to disconnect from this
+ *   device?" — Disconnect / Cancel (no longer disconnects immediately).
+ * - v2.5: the Demo/Live connect buttons were REMOVED from the topbar — the device picker
+ *   (DevicePicker) handles connecting; by the time the topbar shows, you're connected.
+ *   All "not connected" branches in the topbar have been cleaned up.
+ * Nav removed in v2.2, folded into the 4-item menu in the left panel (LeftPanel).
+ * Below is a mono annotation strip in blueprint style (only on screens ≥1536px).
  */
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Bluetooth, Cable, Power, RefreshCw, Wifi } from 'lucide-react';
 import { useMouse } from '../store';
 import { ConfirmModal } from './ui';
 import { ThemeToggle } from './ThemeToggle';
 import { brandLogoSrc } from '../lib/brand';
+import { FALLBACK_APP_VERSION, currentAppVersion } from '../lib/updater';
 
 export function TopBar(): React.JSX.Element {
   const { mode, connected, busy, wired, deviceLabel, disconnect, refresh, theme } = useMouse();
   const [confirmDisconnect, setConfirmDisconnect] = useState(false);
-  // Chế độ kết nối hiện tại: dây → Cable, 2.4G → Wifi, Bluetooth → Bluetooth.
-  // (FW + Pin không hiện ở topbar nữa — đã có trong 4 dock bên dưới.)
+  // Real app version (Tauri getVersion(), fallback = bump-script constant) —
+  // the old hardcoded "v3.0.0" lied on every release after v3.0.0.
+  const [appVersion, setAppVersion] = useState(FALLBACK_APP_VERSION);
+  useEffect(() => {
+    let alive = true;
+    void currentAppVersion().then((v) => {
+      if (alive) setAppVersion(v);
+    });
+    return () => {
+      alive = false;
+    };
+  }, []);
+  // Current connection mode: wired → Cable, 2.4G → Wifi, Bluetooth → Bluetooth.
+  // (FW + Battery no longer show in the topbar — they're in the 4 docks below.)
   return (
     <header className="shrink-0 pt-2">
       <div className="flex flex-wrap items-center gap-2 lg:flex-nowrap">
@@ -31,55 +44,55 @@ export function TopBar(): React.JSX.Element {
           {/* Logo brand 800px — map theo theme (dark → LIGHT file, light → DARK file). */}
           <img src={brandLogoSrc(theme)} alt="SMAILWOLF" className="h-7 w-auto shrink-0" />
           <div className="min-w-0">
-            <div className="font-display text-[18px] leading-none font-bold tracking-wide text-[#c2410c] uppercase">
+            <div className="m3pro-band font-display text-[18px] leading-none font-bold tracking-wide uppercase">
               M3 Pro
             </div>
             <div className="font-mono2 mt-0.5 text-[10px] tracking-[0.18em] text-[#55555c] uppercase">
-              Driver remake · v3.0.0 · clean-room
+              Driver remake · v{appVersion} · clean-room
             </div>
           </div>
         </div>
 
         <div className="ml-auto flex flex-wrap items-center gap-2">
-          {/* v3.0: toggle sáng/tối Uiverse (mamyapro123) — góc trên khung
-              quản lý, ngay cạnh cụm chế độ kết nối. */}
+          {/* v3.0: Uiverse light/dark toggle (mamyapro123) — top corner of the
+              management frame, right next to the connection mode cluster. */}
           <ThemeToggle />
-          {/* Icon chế độ kết nối (thay 2 pill FW/Pin đã xóa ở v2.4): 3 icon
-              Wifi = 2.4G, Cable (ethernet) = dây, Bluetooth = Bluetooth —
-              icon nào đang dùng thì sáng cam, còn lại mờ. (App chỉ tới được
-              chuột qua dây/2.4G bằng WebHID vendor filter — Bluetooth để
-              sẵn cho đường BT sau này.) */}
+          {/* Connection mode cluster (redesign 2026-11-19): ONLY the 3 mode icons
+              inside the frame — no WIRED/2.4G/LIVE text anymore. The active icon
+              glows orange; hovering any icon bounces it up. (The app only reaches the
+              mouse via cable/2.4G through the WebHID vendor filter — Bluetooth is
+              ready for a future BT path.) Demo keeps a tiny DEMO tag so simulation
+              is never mistaken for a real mouse. */}
           {connected && (
             <span
-              className="flex items-center gap-2 rounded-full border border-[rgba(22,22,26,0.16)] bg-white/50 px-3 py-2"
-              title={wired ? 'Chế độ có dây' : 'Chế độ 2.4GHz'}
+              className="flex items-center gap-2.5 rounded-full border border-[rgba(22,22,26,0.16)] bg-white/50 px-3 py-2"
+              title={wired ? 'Wired mode' : '2.4GHz mode'}
             >
-              <Wifi className={`h-4 w-4 ${!wired ? 'text-[#c2410c]' : 'text-[#55555c]/40'}`} />
-              <Cable className={`h-4 w-4 ${wired ? 'text-[#c2410c]' : 'text-[#55555c]/40'}`} />
-              <Bluetooth className="h-4 w-4 text-[#55555c]/40" />
-              <span className="text-[11px] font-bold tracking-wide text-[#33333a]">{wired ? 'DÂY' : '2.4G'}</span>
+              <span title="2.4G" className={`conn-icon ${!wired ? 'conn-icon-active' : ''}`}>
+                <Wifi className="h-4 w-4" />
+              </span>
+              <span title="Wired" className={`conn-icon ${wired ? 'conn-icon-active' : ''}`}>
+                <Cable className="h-4 w-4" />
+              </span>
+              <span title="Bluetooth" className="conn-icon">
+                <Bluetooth className="h-4 w-4" />
+              </span>
+              {mode === 'demo' && (
+                <span className="text-[10px] font-bold tracking-wide text-amber-800">DEMO</span>
+              )}
             </span>
           )}
-          <span
-            className={`rounded-full border px-3 py-2 text-[11px] font-bold tracking-wide ${
-              mode === 'demo'
-                ? 'border-amber-600/40 bg-amber-100 text-amber-800'
-                : 'border-[#c2410c]/40 bg-[#ff5a1f]/10 text-[#c2410c]'
-            }`}
-          >
-            {mode === 'demo' ? 'DEMO · MÔ PHỎNG' : 'LIVE'}
-          </span>
           <button
             onClick={() => setConfirmDisconnect(true)}
-            aria-label="Ngắt kết nối"
-            className="flex h-[44px] min-w-[44px] items-center justify-center gap-1.5 rounded-full border border-[rgba(22,22,26,0.16)] bg-white/50 px-3 text-[13px] font-semibold text-[#16161a] transition hover:bg-white/80"
+            aria-label="Disconnect"
+            className="flex h-[44px] min-w-[44px] items-center justify-center gap-1.5 rounded-full border border-[#b91c1c] bg-[#dc2626] px-3 text-[13px] font-semibold text-white transition hover:bg-[#b91c1c]"
           >
-            <Power className="h-4 w-4" /> Ngắt
+            <Power className="h-4 w-4" /> Disconnect
           </button>
           <button
             onClick={() => void refresh()}
             disabled={!connected || busy}
-            aria-label="Đọc lại từ chuột"
+            aria-label="Re-read from mouse"
             className="flex h-[44px] w-[44px] items-center justify-center rounded-full border border-[rgba(22,22,26,0.16)] bg-white/50 text-[#16161a] transition hover:bg-white/80 disabled:opacity-40"
           >
             <RefreshCw className="h-4 w-4" />
@@ -87,8 +100,8 @@ export function TopBar(): React.JSX.Element {
         </div>
       </div>
 
-      {/* Dải annotation chỉ hiện ở màn rất rộng (≥1536px) — ở 1366x768 nó
-          chiếm 28px chiều cao vô ích, làm cả trang tràn viewport. */}
+      {/* The annotation strip only shows on very wide screens (≥1536px) — at 1366x768 it
+          wastes 28px of height and makes the whole page overflow the viewport. */}
       <div className="font-mono2 mt-2 hidden items-center justify-between gap-2 border-y border-[rgba(22,22,26,0.14)] py-1 text-[10px] tracking-[0.14em] text-[#55555c] uppercase min-[1536px]:flex">
         <span className="flex items-center gap-1.5">
           <span className={`inline-block h-2 w-2 rounded-full ${connected ? 'bg-[#15803d]' : 'bg-[#dc2626]'}`} />
@@ -106,11 +119,11 @@ export function TopBar(): React.JSX.Element {
         </span>
       </div>
 
-      {/* Hỏi xác nhận trước khi ngắt (v2.4, theo yêu cầu bro). */}
+      {/* Ask for confirmation before disconnecting (v2.4, per Ethan's request). */}
       <ConfirmModal
         open={confirmDisconnect}
-        title="Ngắt kết nối?"
-        confirmLabel="Đồng ý"
+        title="Disconnect?"
+        confirmLabel="Disconnect"
         danger
         onConfirm={() => {
           setConfirmDisconnect(false);
@@ -118,7 +131,7 @@ export function TopBar(): React.JSX.Element {
         }}
         onCancel={() => setConfirmDisconnect(false)}
       >
-        Bạn có muốn ngắt kết nối với thiết bị này?
+        Do you want to disconnect from this device?
       </ConfirmModal>
     </header>
   );

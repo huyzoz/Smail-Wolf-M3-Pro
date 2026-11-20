@@ -1,10 +1,10 @@
 /**
- * MouseStage v2.3 — cột phải: ẢNH THẬT chuột M3 Pro (như bro yêu cầu —
- * bỏ mô hình 3D dựng lại) + nhãn binding live + popup gán phím bay vào
- * khung panel trái + nút "Reset to default".
- * ĐÃ XÓA theo yêu cầu của bro: 2 dòng header stage ("[MOUSE // M3 PRO]..."
- * + dòng hint "Bấm 1 nút trên chuột...") và caption "Mô hình 3D dựng từ
- * số đo... không phải ảnh chụp" — giờ là ảnh thật nên caption đó sai.
+ * MouseStage v2.3 — right column: REAL PHOTO of the M3 Pro mouse (as Ethan requested —
+ * dropping the rebuilt 3D model) + live binding labels + the key-assignment popup flying into
+ * the left panel frame + the "Reset to default" button.
+ * REMOVED per Ethan's request: 2 stage header lines ("[MOUSE // M3 PRO]..."
+ * + the hint line "Click a button on the mouse...") and the caption "3D model rebuilt from
+ * measurements... not a photo" — now it's a real photo, so that caption was wrong.
  */
 import { useEffect, useRef, useState } from 'react';
 import { RotateCcw } from 'lucide-react';
@@ -46,11 +46,11 @@ export function MouseStage(): React.JSX.Element {
 
   const onPartClick = (keyIndex: number, point: { x: number; y: number }): void => {
     if (!connected || !keys) {
-      setNote('Chưa kết nối — chọn Demo (mô phỏng) hoặc Kết nối chuột thật ở thanh trên cùng trước.');
+      setNote('Not connected — pick Demo (simulated) or Connect a real mouse in the top bar first.');
       return;
     }
     if (keyIndex === 5) {
-      const msg = 'Nút DPI cố định — không gán lại được (app gốc cũng vậy).';
+      const msg = 'The DPI button is fixed — it cannot be reassigned (same in the original app).';
       setNote(msg);
       addLog(msg);
       return;
@@ -61,7 +61,7 @@ export function MouseStage(): React.JSX.Element {
       stageRect && panelRect
         ? { x: panelRect.left - stageRect.left + 60, y: panelRect.top - stageRect.top + 220 }
         : { x: 40, y: 200 };
-    // point là client coords -> đổi sang tọa độ trong stage div.
+    // point is in client coords -> convert to coordinates inside the stage div.
     const anchor = stageRect ? { x: point.x - stageRect.left, y: point.y - stageRect.top } : point;
     setPopup({ keyIndex, anchor, flyTarget });
   };
@@ -74,11 +74,11 @@ export function MouseStage(): React.JSX.Element {
     const name = keyName(binding.type, binding.code1, binding.code2, binding.code3);
     setPopup(null);
     const ok = await saveKeys(next);
-    if (ok) addLog(`Đã gán ${label} → ${name}${mode === 'demo' ? ' (mô phỏng)' : ''}.`);
+    if (ok) addLog(`Assigned ${label} → ${name}${mode === 'demo' ? ' (simulated)' : ''}.`);
   };
 
   return (
-    <section className="relative flex min-w-0 flex-col lg:min-h-0 lg:flex-1" aria-label="Ảnh chuột SMAILWOLF M3 Pro">
+    <section className="relative flex min-w-0 flex-col lg:min-h-0 lg:flex-1" aria-label="SMAILWOLF M3 Pro mouse photo">
       {note && (
         <div
           className="mb-2 shrink-0 rounded-xl border border-amber-600/40 bg-amber-100 px-3 py-2 text-[13px] text-amber-900"
@@ -88,9 +88,9 @@ export function MouseStage(): React.JSX.Element {
         </div>
       )}
 
-      {/* Stage co giãn theo chiều cao còn lại của viewport (desktop),
-          mobile giữ chiều cao cố định để cuộn trang bình thường — ảnh
-          position absolute nên khung phải có chiều cao cố định ở mobile. */}
+      {/* The stage stretches with the viewport's remaining height (desktop),
+          mobile keeps a fixed height for normal page scrolling — the image
+          is position absolute, so the frame needs a fixed height on mobile. */}
       <div ref={stageRef} className="relative h-[420px] min-h-0 sm:h-[480px] lg:h-auto lg:flex-1">
         <MousePhoto keys={keys} onPartClick={onPartClick} src={skinSrc(skinId)} />
         {popup && (
@@ -117,8 +117,8 @@ export function MouseStage(): React.JSX.Element {
 
       <ConfirmModal
         open={confirmReset}
-        title="Khôi phục mặc định gốc?"
-        confirmLabel="Khôi phục"
+        title="Restore factory defaults?"
+        confirmLabel="Restore"
         danger
         onConfirm={() => {
           setConfirmReset(false);
@@ -126,7 +126,7 @@ export function MouseStage(): React.JSX.Element {
         }}
         onCancel={() => setConfirmReset(false)}
       >
-        Ghi lại cấu hình mặc định của app gốc + phím mặc định xuống chuột.
+        Writes the original app's default config + default keys to the mouse.
       </ConfirmModal>
     </section>
   );

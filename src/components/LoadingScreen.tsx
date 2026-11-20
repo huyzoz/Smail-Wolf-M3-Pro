@@ -1,13 +1,13 @@
 /**
- * Màn loading v3.0 — sau khi kết nối, BẮT BUỘC load đúng 3 giây (store
- * hẹn giờ 3000ms, rút từ 5s) rồi giao diện chính mới trôi lên. Hiệu ứng
- * là la bàn ancient-yak-42 (Uiverse Nawsome) ở GIỮA màn hình, các layer
- * phía sau che mờ hết (nền navy đậm + backdrop-blur-md). SVG + CSS la
- * bàn lấy nguyên văn (xem loaders/ancient-yak-42.html, class .pl* trong
- * index.css). Chu kỳ la bàn là 2s nên trong 3s nó quay 1.5 vòng — 3s là
- * thời gian của MÀN HÌNH, không phải của 1 vòng la bàn.
- * Logo: file brand LIGHT 800px (swoosh TRẮNG) — nền màn loading LUÔN
- * navy tối ở cả 2 theme nên luôn dùng swoosh trắng (quy tắc của Ethan).
+ * Loading screen v3.0 — after connecting, it MUST load for exactly 3 seconds (the store
+ * sets a 3000ms timer, cut from 5s) before the main UI rises up. The effect is
+ * the ancient-yak-42 compass (Uiverse Nawsome) in the MIDDLE of the screen, with the layers
+ * behind fully blurred (deep navy background + backdrop-blur-md). The compass SVG + CSS come
+ * verbatim (see loaders/ancient-yak-42.html, .pl* classes in
+ * index.css). The compass cycle is 2s, so in 3s it spins 1.5 turns — the 3s is
+ * the SCREEN's time, not one compass turn.
+ * Logo: LIGHT brand file 800px (WHITE swoosh) — the loading screen background is ALWAYS
+ * dark navy in both themes, so it always uses the white swoosh (Ethan's rule).
  */
 import { motion } from 'framer-motion';
 import { BRAND_ON_DARK } from '../lib/brand';
@@ -21,10 +21,10 @@ export default function LoadingScreen(): React.JSX.Element {
       transition={{ duration: 0.3 }}
       className="fixed inset-0 z-[100] flex flex-col items-center justify-center bg-[#0b0b26]/85 backdrop-blur-md"
       role="status"
-      aria-label="Đang tải giao diện"
+      aria-label="Loading interface"
     >
       <img src={BRAND_ON_DARK} alt="SMAILWOLF" className="mb-8 h-10 w-auto" />
-      {/* La bàn ancient-yak-42 (nguyên văn). */}
+      {/* Ancient-yak-42 compass (verbatim). */}
       <svg className="pl" viewBox="0 0 160 160" width="160px" height="160px" xmlns="http://www.w3.org/2000/svg">
         <defs>
           <linearGradient id="grad" x1="0" y1="0" x2="0" y2="1">
@@ -92,7 +92,7 @@ export default function LoadingScreen(): React.JSX.Element {
           </g>
         </g>
       </svg>
-      <p className="mt-6 text-sm font-semibold tracking-wide text-white/85">Đang tải giao diện…</p>
+      <p className="mt-6 text-sm font-semibold tracking-wide text-white/85">Loading interface…</p>
     </motion.div>
   );
 }

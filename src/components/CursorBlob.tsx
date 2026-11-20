@@ -1,11 +1,11 @@
 /**
- * CursorBlob v3.0 — blob đỏ kính lỏng đuổi theo con trỏ TOÀN APP
- * (kể cả trong khung quản lý / màn chọn thiết bị).
+ * CursorBlob v3.0 — red liquid-glass blob chasing the pointer across the WHOLE APP
+ * (including inside the management frame / device picker).
  *
- * KHÔNG phải icon con trỏ: con trỏ hệ thống vẫn hiện bình thường, blob
- * chỉ ĐUỔI theo sau (lerp 0.12/khung qua rAF) như 1 giọt chất lỏng.
- * Chỉ transform + opacity (GPU), pointer-events: none nên không bao giờ
- * chặn click. Ẩn hẳn khi prefers-reduced-motion hoặc màn cảm ứng
+ * NOT a cursor icon: the system cursor stays visible as normal, the blob
+ * only CHASES behind it (lerp 0.12/frame via rAF) like a drop of liquid.
+ * Transform + opacity only (GPU), pointer-events: none so it never
+ * blocks clicks. Fully hidden under prefers-reduced-motion or on touch screens
  * (xem .cursor-blob trong index.css).
  */
 import { useEffect, useRef } from 'react';
@@ -28,7 +28,7 @@ export function CursorBlob(): React.JSX.Element {
     let lastMove = 0;
     const tick = (): void => {
       if (tx < -100) {
-        // Chưa di chuột lần nào: blob nấp ngoài màn hình.
+        // Mouse never moved yet: the blob hides off-screen.
         el.style.opacity = '0';
       } else {
         if (x < -100) {
@@ -37,14 +37,14 @@ export function CursorBlob(): React.JSX.Element {
         }
         x += (tx - x) * 0.12;
         y += (ty - y) * 0.12;
-        // Đứng yên >2.5s thì mờ dần (không nằm chình ình 1 chỗ).
+        // Idle for >2.5s, it fades out (doesn't sit in one spot).
         if (performance.now() - lastMove > 2500) targetOpacity = 0;
         opacity += (targetOpacity - opacity) * 0.08;
         el.style.transform = `translate3d(${x - 28}px, ${y - 28}px, 0)`;
         el.style.opacity = opacity.toFixed(3);
       }
-      // v3.0.2 — LAG FIX: đừng chạy rAF mãi khi chuột đứng yên. Dừng vòng
-      // lặp khi blob đã mờ hẳn + không còn di chuyển; onMove khởi động lại.
+      // v3.0.2 — LAG FIX: don't run rAF forever while the mouse is idle. Stop the
+      // loop once the blob has fully faded + stopped moving; onMove restarts it.
       const active =
         targetOpacity > 0 || opacity > 0.01 || performance.now() - lastMove < 2600;
       if (active) {

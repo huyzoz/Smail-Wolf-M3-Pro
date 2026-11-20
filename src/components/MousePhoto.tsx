@@ -1,21 +1,21 @@
 /**
- * MousePhoto — ẢNH CHUỘT kiểu anime bro gửi (v2.6, thay ảnh thật v2.3).
- * Ảnh anime 944x1667, nền trong suốt — vẽ tay trắng bóng, con lăn + nút
- * DPI + 2 nút hông đen đặc, rõ hơn ảnh chụp cũ.
+ * MousePhoto — anime-style MOUSE PHOTO Ethan sent (v2.6, replaces the real photo from v2.3).
+ * Anime image 944x1667, transparent background — hand-drawn glossy white, scroll wheel + buttons
+ * DPI + 2 solid-black side buttons, clearer than the old photo.
  *
- * Vị trí các nút = số đo thật từ ảnh (PIL/numpy, erosion 3px để giết
- * viền nét mảnh, chỉ giữ vùng đen đặc — không đoán):
- * - con lăn (đen đặc): tâm (0.50, 0.227) — vùng x 0.434-0.566, y 0.134-0.319
- * - nút DPI (capsule đen): tâm (0.50, 0.398) — vùng x 0.237-0.778, y 0.326-0.470
- * - nút hông trên (Copy mặc định): tâm (0.090, 0.410) — x 0.072-0.108, y 0.342-0.478
- * - nút hông dưới (Paste mặc định): tâm (0.102, 0.546) — x 0.083-0.121, y 0.480-0.613
- * - tấm trái / phải: tâm (0.27, 0.22) / (0.73, 0.22) (thân trên chia đôi ở x=0.50)
- * Nhãn giữ kiểu ảnh 2: tag viền mảnh + kẻ nối chéo (dy so le) + chấm trên nút.
+ * Button positions = real measurements from the image (PIL/numpy, 3px erosion to kill
+ * thin outline edges, keeping only solid black areas — no guessing):
+ * - scroll wheel (solid black): center (0.50, 0.227) — x range 0.434-0.566, y 0.134-0.319
+ * - DPI button (black capsule): center (0.50, 0.398) — x range 0.237-0.778, y 0.326-0.470
+ * - upper side button (Copy by default): center (0.090, 0.410) — x 0.072-0.108, y 0.342-0.478
+ * - lower side button (Paste by default): center (0.102, 0.546) — x 0.083-0.121, y 0.480-0.613
+ * - left / right panels: center (0.27, 0.22) / (0.73, 0.22) (upper body split at x=0.50)
+ * Labels keep the image-2 style: thin-bordered tag + diagonal connector (staggered dy) + dot on the button.
  *
- * v2.6 hover: rê chuột vào 1 nút (vùng bấm hoặc tag) → phần tử đó SÁNG
- * lên (lớp glow cam phủ đúng hình nút) + nảy nhẹ như bấm thật
- * (.part-glow + keyframes partPress) + tag/kẻ nối/chấm chuyển cyberpunk
- * (nền navy, chữ cam, viền + hào quang neon). Áp cho cả 6 nút.
+ * v2.6 hover: hovering a button (click area or tag) → that part LIGHTS UP
+ * (orange glow layer covering exactly the button shape) + a light bounce like a real click
+ * (.part-glow + partPress keyframes) + tag/connector/dot switch to cyberpunk
+ * (navy background, orange text, border + neon halo). Applies to all 6 buttons.
  */
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { keyName, SYSTEM_KEY_ACTIONS, type KeyBinding } from '../lib/hid';
@@ -37,14 +37,14 @@ interface LabelDef {
   keyIndex: number;
   title: string;
   side: 'left' | 'right';
-  /** Vị trí neo = tỉ lệ (0..1) trên khung ảnh (đo thật từ ảnh, xem header). */
+  /** Anchor position = ratio (0..1) on the image frame (measured from the real image, see header). */
   fx: number;
   fy: number;
   valueOnly?: boolean;
   line?: number;
-  /** Tag lệch dọc khỏi chấm (px, + = xuống) — 3 nhãn bên phải có chấm
-      cách nhau chỉ ~20px nên phải so le tag lên/xuống, kẻ nối thành
-      đường chéo nhẹ như ảnh 2. */
+  /** Tag vertical offset from the dot (px, + = down) — the 3 right-side labels have dots
+      only ~20px apart, so tags must stagger up/down and connectors become
+      slight diagonals like image 2. */
   dy?: number;
 }
 
@@ -65,25 +65,25 @@ export function MousePhoto({
 }: {
   keys: KeyBinding[] | null;
   onPartClick: (keyIndex: number, point: { x: number; y: number }) => void;
-  /** Ảnh chuột đang hiển thị — skin đang chọn (v2.7). Mọi skin đều cùng
-      canvas 944x1667 nên neo bấm đo sẵn dùng chung. */
+  /** The mouse image currently shown — the selected skin (v2.7). All skins share the same
+      944x1667 canvas, so the pre-measured click anchors are shared. */
   src?: string;
 }): React.JSX.Element {
   const containerRef = useRef<HTMLDivElement>(null);
   const imgRef = useRef<HTMLImageElement>(null);
   const [labels, setLabels] = useState<LabelPos[]>([]);
-  // v2.6 hover: nút nào đang được rê vào (vùng bấm hoặc tag) → glow sáng
-  // đúng hình phần tử đó + nảy nhẹ như bấm thật.
+  // v2.6 hover: whichever button is hovered (click area or tag) → glow lights up
+  // exactly that part's shape + a light bounce like a real click.
   const [hovered, setHovered] = useState<number | null>(null);
   const [imgBox, setImgBox] = useState({ x: 0, y: 0, w: 0, h: 0 });
-  // v2.7: kích thước ảnh FIT trong khung (tính từ tỉ lệ thật của ảnh).
-  // BUG v2.6: img chỉ có h-[96%] w-auto — ở viewport DỌC (cao, hẹp) ảnh
-  // cao 96% khung thì bề ngang vượt khung → 2 bên bị cắt, nhìn như kéo
-  // giãn dọc rất xấu (đúng ảnh bro chụp ở 1080x1920). Fit cả 2 chiều
-  // thì không bao giờ tràn/cắt, giữ đúng aspect ở mọi tỉ lệ.
+  // v2.7: image size FITs the frame (computed from the image's real aspect ratio).
+  // BUG v2.6: img only had h-[96%] w-auto — in a PORTRAIT viewport (tall, narrow) the image
+  // at 96% frame height overflows the width → both sides get cropped, looking stretched
+  // vertically and ugly (exactly the screenshot Ethan took at 1080x1920). Fitting both dimensions
+  // never overflows/crops and keeps the correct aspect at any ratio.
   const [imgSize, setImgSize] = useState({ w: 0, h: 0 });
-  // Ảnh load xong (naturalWidth có số thật) thì đo lại — skin khác có
-  // thể khác canvas, layout phải theo ảnh thật chứ không theo fallback.
+  // Once the image loads (naturalWidth has real numbers), re-measure — another skin may
+  // have a different canvas, so layout must follow the real image, not the fallback.
   const [imgLoaded, setImgLoaded] = useState(0);
 
   const labelDefs: LabelDef[] = useMemo(() => {
@@ -109,9 +109,9 @@ export function MousePhoto({
     }));
   }, [keys]);
 
-  // Ảnh căn giữa, fit 96% khung theo CẢ 2 chiều (giữ aspect): vị trí
-  // ảnh suy ra từ kích thước khung + tỉ lệ thật của ảnh (naturalWidth/
-  // naturalHeight; fallback 944x1667 là canvas chuẩn của mọi skin).
+  // Image centered, fit to 96% of the frame in BOTH dimensions (keeps aspect): the image position
+  // is derived from the frame size + the image's real aspect ratio (naturalWidth/
+  // naturalHeight; fallback 944x1667 is the standard canvas of every skin).
   useEffect(() => {
     const layout = (): void => {
       const container = containerRef.current;
@@ -130,30 +130,30 @@ export function MousePhoto({
       const pos: LabelPos[] = labelDefs.map((d) => {
         const x = ix + d.fx * iw;
         const y = iy + d.fy * ih;
-        // Cắt ngắn leader để tag không tràn khỏi khung (mobile 390px ở v2.0
-        // tràn ngang 132px — vi phạm pro-max §5, không horizontal scroll).
-        // v2.7: ước lượng bề rộng tag phải DƯ (chữ in hoa + letter-spacing
-        // khiến tag thật rộng hơn ~10px so với ước lượng cũ 7.2/18) — ở
-        // dọc 1080x1920 tag Right tràn 6px, Left/Copy/Paste tràn 5-9px
-        // khỏi mép stage và bị overflow-hidden cắt (đo thật bằng Playwright).
+        // Shorten the leader so tags don't overflow the frame (mobile 390px in v2.0
+        // overflowed horizontally by 132px — violates pro-max §5, no horizontal scroll).
+        // v2.7: tag width estimates must have SPARE room (uppercase + letter-spacing
+        // make real tags ~10px wider than the old 7.2/18 estimate) — at
+        // portrait 1080x1920 the Right tag overflows 6px, Left/Copy/Paste 5-9px
+        // past the stage edge and get cut by overflow-hidden (measured with Playwright).
         const tagW = d.title.length * 8.2 + 26;
         const want = d.line ?? 40;
-        // Sàn leader 4px (không phải 14): neo Copy/Paste ở mép trái ảnh
-        // (x≈66-73px) — với sàn 14 tag vẫn tràn 8-9px khỏi mép stage ở
-        // dọc 1080x1920; sàn 4 cho tag lùi sát chấm, vẫn đủ đọc.
+        // Leader floor 4px (not 14): the Copy/Paste anchors sit at the image's left edge
+        // (x≈66-73px) — with a floor of 14 the tags still overflow 8-9px past the stage edge at
+        // portrait 1080x1920; a floor of 4 pulls tags close to the dot while staying readable.
         const line =
           d.side === 'left'
             ? Math.min(want, Math.max(4, x - tagW - 12))
             : Math.min(want, Math.max(4, cw - x - tagW - 12));
         return { keyIndex: d.keyIndex, title: d.title, side: d.side, x, y, line, dy: d.dy ?? 0 };
       });
-      // v3.0: tag cùng 1 phía phải cách nhau — v2.8.1 chỉ cho khe hở
-      // ~13px (TAG_MIN_CTR = 38) mà bro vẫn chê quá gần. Giờ tách tối
-      // thiểu TAG_MIN_CTR = 65px tâm-tâm (khe hở nhìn thấy ~40px, gấp
-      // ~3 lần trước): Middle dy -48 (bay lên trên Right), DPI dy +56
-      // (đẩy xuống dưới), thuật toán vẫn chỉ đẩy tag DƯỚI xuống và kẹp
-      // cả nhóm trong khung nếu tràn dưới. Chỉ đẩy tag dưới xuống
-      // (không đụng tag trên), kẻ nối chỉ nghiêng thêm vài độ.
+      // v3.0: tags on the same side must be spaced apart — v2.8.1 only allowed a gap of
+      // ~13px (TAG_MIN_CTR = 38) and Ethan still said it was too tight. Now the minimum
+      // separation is TAG_MIN_CTR = 65px center-to-center (visible gap ~40px, about
+      // ~3x before): Middle dy -48 (flies up above Right), DPI dy +56
+      // (pushed down), the algorithm still only pushes the LOWER tag down and clamps
+      // the whole group inside the frame if it overflows below. Only push the lower tag down
+      // (never touch the upper tag); connectors only tilt a few more degrees.
       const TAG_H = 25; // .tag: font 11px + padding 4px + border 1px
       const TAG_MIN_CTR = TAG_H + 40;
       for (const side of ['left', 'right'] as const) {
@@ -173,7 +173,7 @@ export function MousePhoto({
       setLabels(pos);
       setImgBox({ x: ix, y: iy, w: iw, h: ih });
       setImgSize((prev) => (prev.w === Math.round(iw) && prev.h === Math.round(ih) ? prev : { w: Math.round(iw), h: Math.round(ih) }));
-      // Hook cho headless test: bấm đúng tọa độ từng nút (tọa độ trong khung).
+      // Hook for headless tests: click the exact coordinates of each button (frame coordinates).
       (window as unknown as { __mousePhoto?: unknown }).__mousePhoto = {
         ready: true,
         anchors: Object.fromEntries(pos.map((p) => [p.keyIndex, { x: Math.round(p.x), y: Math.round(p.y) }])),
@@ -187,9 +187,9 @@ export function MousePhoto({
     return () => ro.disconnect();
   }, [labelDefs, imgLoaded]);
 
-  // Hình glow phủ đúng từng phần tử (tỉ lệ trên ảnh, xem header): tấm
-  // trái/phải = ellipse lớn phủ nửa thân trên; con lăn/DPI = capsule;
-  // nút hông = chữ nhật bo góc ở mép trái.
+  // Glow shape covering exactly each part (ratios on the image, see header): the left/right
+  // panels = a large ellipse over the upper half; wheel/DPI = capsule;
+  // side buttons = rounded rectangle at the left edge.
   const PART_GLOW: Record<number, { fx: number; fy: number; w: number; h: number; r: string }> = {
     0: { fx: 0.27, fy: 0.22, w: 0.46, h: 0.34, r: '45%' },
     1: { fx: 0.73, fy: 0.22, w: 0.46, h: 0.34, r: '45%' },
@@ -204,7 +204,7 @@ export function MousePhoto({
       ref={containerRef}
       className="relative h-full w-full overflow-hidden"
       role="img"
-      aria-label="Ảnh chuột SMAILWOLF M3 Pro — bấm 1 nút trên chuột để gán phím"
+      aria-label="SMAILWOLF M3 Pro mouse photo — click a button on the mouse to assign a key"
     >
       <img
         ref={imgRef}
@@ -215,7 +215,7 @@ export function MousePhoto({
         className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 select-none"
         style={imgSize.w > 0 ? { width: imgSize.w, height: imgSize.h } : { height: '96%', width: 'auto' }}
       />
-      {/* Lớp glow cam phủ đúng hình phần tử đang được rê vào (v2.6). */}
+      {/* Orange glow layer covering exactly the hovered part's shape (v2.6). */}
       {Object.entries(PART_GLOW).map(([k, g]) => {
         const i = Number(k);
         return (
@@ -233,8 +233,8 @@ export function MousePhoto({
           />
         );
       })}
-      {/* Vùng bấm vô hình trên từng nút (44x44, tâm = neo đo thật từ ảnh) —
-          bấm đúng vào nút trên ảnh thì mở popup gán phím. */}
+      {/* Invisible click areas on each button (44x44, center = anchor measured from the real image) —
+          clicking the right button on the image opens the key-assignment popup. */}
       {labels.map((l) => (
         <button
           key={`zone-${l.keyIndex}`}
@@ -246,7 +246,7 @@ export function MousePhoto({
           onMouseLeave={() => setHovered((h) => (h === l.keyIndex ? null : h))}
           onFocus={() => setHovered(l.keyIndex)}
           onBlur={() => setHovered((h) => (h === l.keyIndex ? null : h))}
-          aria-label={`Gán phím cho nút ${l.title}`}
+          aria-label={`Assign key for ${l.title}`}
         />
       ))}
       {labels.map((l) => (
@@ -265,7 +265,7 @@ export function MousePhoto({
           onMouseLeave={() => setHovered((h) => (h === l.keyIndex ? null : h))}
           onFocus={() => setHovered(l.keyIndex)}
           onBlur={() => setHovered((h) => (h === l.keyIndex ? null : h))}
-          aria-label={`Gán phím cho nút ${l.title}`}
+          aria-label={`Assign key for ${l.title}`}
         >
           {l.side === 'left' ? (
             <>

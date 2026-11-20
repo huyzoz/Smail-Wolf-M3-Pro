@@ -1,8 +1,8 @@
 /**
- * AssignPopup — theo ảnh 4: panel tối, 4 tab System / Keyboard /
- * Instruction / Macro, danh sách hành động gán cho 1 nút chuột.
- * Chọn xong: popup BAY vào khung panel trái (framer-motion) rồi mới ghi.
- * Hành động lấy từ systemKey catalog của app gốc (chunk 515, module 5608).
+ * AssignPopup — per image 4: dark panel, 4 tabs System / Keyboard /
+ * Instruction / Macro, a list of actions to assign to one mouse button.
+ * After choosing: the popup FLIES into the left panel frame (framer-motion) and only then writes.
+ * Actions come from the original app's systemKey catalog (chunk 515, module 5608).
  */
 import { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
@@ -46,7 +46,7 @@ export function AssignPopup({
 
   const current = keys?.[keyIndex];
 
-  // Keyboard capture — giống KeysPage (1 keydown -> HID + modifier bitmask).
+  // Keyboard capture — same as KeysPage (1 keydown -> HID + modifier bitmask).
   useEffect(() => {
     if (!capturing) return;
     const handler = (e: KeyboardEvent): void => {
@@ -93,25 +93,25 @@ export function AssignPopup({
         if (flying) onAssign(flying);
       }}
       role="dialog"
-      aria-label={`Gán phím cho ${KEY_LABELS[keyIndex]}`}
+      aria-label={`Assign key to ${KEY_LABELS[keyIndex]}`}
     >
       <div className="flex items-center justify-between border-b border-white/10 px-4 pt-3 pb-2">
         <div>
-          <div className="text-sm font-bold text-white">Gán phím — {KEY_LABELS[keyIndex]}</div>
+          <div className="text-sm font-bold text-white">Key Binding — {KEY_LABELS[keyIndex]}</div>
           <div className="mt-0.5 font-mono text-[11px] text-[#a2a2b0]">
-            Hiện tại: {current ? keyName(current.type, current.code1, current.code2, current.code3) : '—'}
+            Current: {current ? keyName(current.type, current.code1, current.code2, current.code3) : '—'}
           </div>
         </div>
         <button
           onClick={onClose}
-          aria-label="Đóng popup gán phím"
+          aria-label="Close key-assignment popup"
           className="flex h-[36px] w-[36px] items-center justify-center rounded-lg text-white/70 hover:bg-white/10 hover:text-white"
         >
           <X className="h-4 w-4" />
         </button>
       </div>
 
-      <div className="flex border-b border-white/10 px-2" role="tablist" aria-label="Loại hành động">
+      <div className="flex border-b border-white/10 px-2" role="tablist" aria-label="Action type">
         {TABS.map((t) => (
           <button
             key={t.id}
@@ -133,7 +133,7 @@ export function AssignPopup({
         {tab === 'system' || tab === 'instruction' ? (
           <>
             <p className="mb-2 px-1 text-xs leading-relaxed text-[#a2a2b0]">
-              Bấm 1 hành động để gán cho nút này — popup sẽ bay vào khung cấu hình bên trái rồi ghi xuống chuột.
+              Click an action to assign to this button — the popup will fly into the config panel on the left, then write to the mouse.
             </p>
             {groupsFor(tab).map((g) => (
               <div key={g.id} className="mb-3">
@@ -157,19 +157,19 @@ export function AssignPopup({
             {tab === 'system' && (
               <div className="mb-1">
                 <div className="font-mono2 px-1 pb-1 text-[11px] font-semibold tracking-[0.16em] text-[#a2a2b0] uppercase">
-                  Khác
+                  Other
                 </div>
                 <button
                   onClick={() => pick({ type: 33, code1: 85, code2: 0, code3: 0 })}
                   className="flex min-h-[44px] w-full items-center rounded-xl px-3 text-left text-sm text-white transition hover:bg-white/10"
                 >
-                  Nút DPI
+                  DPI Button
                 </button>
                 <button
                   onClick={() => pick({ type: 0, code1: 0, code2: 0, code3: 0 })}
                   className="flex min-h-[44px] w-full items-center rounded-xl px-3 text-left text-sm text-white transition hover:bg-white/10"
                 >
-                  Để trống
+                  Empty
                 </button>
               </div>
             )}
@@ -177,7 +177,7 @@ export function AssignPopup({
         ) : tab === 'keyboard' ? (
           <div>
             <p className="mb-3 px-1 text-xs leading-relaxed text-[#a2a2b0]">
-              Bấm nút dưới rồi nhấn 1 phím thật (kèm Ctrl/Shift/Alt nếu muốn) để gán.
+              Click the button below, then press a real key (with Ctrl/Shift/Alt if you want) to assign it.
             </p>
             <button
               onClick={() => setCapturing(true)}
@@ -188,14 +188,14 @@ export function AssignPopup({
               }`}
             >
               <Keyboard className="h-4 w-4" />
-              {capturing ? 'Đang nghe… nhấn 1 phím' : 'Bấm phím…'}
+              {capturing ? 'Listening… press a key' : 'Press a key…'}
             </button>
           </div>
         ) : (
           <div>
             {macros.length === 0 ? (
               <p className="px-1 py-3 text-sm text-[#a2a2b0]">
-                Chưa có macro nào — sang tab Macro tạo trước rồi quay lại gán.
+                No macros yet — create one in the Macro tab first, then come back to assign it.
               </p>
             ) : (
               macros.map((m, mi) => (

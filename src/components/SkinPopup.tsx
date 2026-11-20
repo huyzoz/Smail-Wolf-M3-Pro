@@ -1,25 +1,25 @@
 /**
- * SkinPopup v3.0 — thay strip ngang v2.7 (bro không muốn lướt ngang nữa):
- * 1 nút layer "Skin" dưới dock Pin -> bấm mở popup TO chứa toàn bộ skin.
+ * SkinPopup v3.0 — replaces the v2.7 horizontal strip (Ethan didn't want horizontal scrolling anymore):
+ * 1 "Skin" layer button below the Battery dock -> click to open the LARGE popup with all skins.
  *
- * - Lưới 5 skin / hàng, đủ 5 cái trọn vẹn (không cắt viền), skin đầu tiên
- *   LUÔN là Mặc định; mỗi skin có tên ngay dưới ảnh.
- * - Mở popup -> preload THẬT toàn bộ 67 thumbnail qua Image(), hiện la
- *   bàn ancient-yak-42 + thanh tiến độ thật "n/67". v3.0: BỎ HẲN
- *   PRELOAD_TIMEOUT_MS=10000 (v2.8: timeout resolve bất kể load xong hay
- *   chưa = loading GIẢ) — giờ chỉ tắt loader khi Promise.all settle
- *   hết: ảnh lỗi vẫn tính là xong (không bao giờ kẹt), không timeout.
- *   Overlay loader chỉ BLUR nền (backdrop-blur, KHÔNG dim/mờ màu).
- * - v3.0 VIRTUALIZE lưới: chỉ render các hàng đang thấy (+2 hàng đệm
- *   mỗi phía), hàng ngoài khung không có trong DOM — lướt 67 skin
- *   không còn lag. Hàng cao cố định ROW_PITCH=200px (thẻ ~188px + khe
- *   12px). Full-res (src) chỉ preload LAZY khi rê/chọn 1 skin (hover,
- *   focus, click) — không tải 9MB x 67 lúc mở popup.
- * - Chọn skin trong lưới = chọn tạm (pending). "Áp dụng" mới đổi thật
- *   (stage + localStorage + toast). "Hủy" đóng popup, không đổi gì.
- *   Skin đang dùng có nút "Hủy áp dụng" ngay trên thẻ — bấm là về Mặc
- *   định ngay. Đằng sau popup mờ đen toàn màn hình (portal ra body, như
- *   ConfirmModal v2.6 — tránh bẫy transform của .app-enter).
+ * - Grid of 5 skins / row, all 5 fully visible (no cut borders), the first skin is
+ *   ALWAYS Default; each skin's name sits right below its image.
+ * - Opening the popup -> REALLY preloads all 67 thumbnails via Image(), showing the
+ *   ancient-yak-42 compass + a real "n/67" progress bar. v3.0: the
+ *   PRELOAD_TIMEOUT_MS=10000 is GONE entirely (v2.8: the timeout resolved whether loading
+ *   finished or not = FAKE loading) — now the loader only turns off once Promise.all settles
+ *   completely: failed images still count as done (never gets stuck), no timeout.
+ *   The loader overlay only BLURs the background (backdrop-blur, NO dimming/fading).
+ * - v3.0 grid VIRTUALIZATION: only renders the rows currently visible (+2 buffer rows
+ *   on each side); rows outside the frame aren't in the DOM — scrolling 67 skins
+ *   no longer lags. Fixed row height ROW_PITCH=200px (card ~188px + 12px
+ *   gap). Full-res (src) is only preloaded LAZILY when hovering/selecting a skin (hover,
+ *   focus, click) — no downloading 9MB x 67 when the popup opens.
+ * - Picking a skin in the grid = a tentative pick (pending). "Apply" is what really changes it
+ *   (stage + localStorage + toast). "Cancel" closes the popup, changing nothing.
+ *   The skin in use has a "Revert to Default" button right on its card — click it to go back to
+ *   Default immediately. Behind the popup, a full-screen black blur (portal to body, like
+ *   ConfirmModal v2.6 — avoids the .app-enter transform trap).
  */
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
@@ -30,15 +30,15 @@ import { useMouse } from '../store';
 import { GlassButton, useScrollLock } from './ui';
 
 const COLS = 5;
-/** Chiều cao 1 hàng lưới (thẻ ~188px + khe 12px) — virtualize cần cố định. */
+/** Height of one grid row (card ~188px + 12px gap) — virtualization needs it fixed. */
 const ROW_PITCH = 200;
 
-/** La bàn ancient-yak-42 (Uiverse Nawsome), nguyên văn như LoadingScreen
- *  nhưng KHÔNG logo, ids svg thêm hậu tố -skin để không trùng LoadingScreen. */
+/** Ancient-yak-42 compass (Uiverse Nawsome), verbatim like LoadingScreen
+ *  but WITHOUT the logo, svg ids suffixed -skin to avoid clashing with LoadingScreen. */
 function CompassLoader({ done, total }: { done: number; total: number }): React.JSX.Element {
   const pct = total > 0 ? Math.round((done / total) * 100) : 0;
   return (
-    <div className="flex flex-col items-center justify-center py-16" role="status" aria-label="Đang tải skin">
+    <div className="flex flex-col items-center justify-center py-16" role="status" aria-label="Loading skins">
       <svg className="pl" viewBox="0 0 160 160" width="120px" height="120px" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
         <defs>
           <linearGradient id="grad-skin" x1="0" y1="0" x2="0" y2="1">
@@ -104,16 +104,16 @@ function CompassLoader({ done, total }: { done: number; total: number }): React.
         </g>
       </svg>
       <p className="mt-4 text-sm font-semibold tracking-wide text-[#16161a]">
-        Đang tải skin… {done}/{total}
+        Loading skins… {done}/{total}
       </p>
-      {/* Thanh tiến độ THẬT — rộng theo done/total, không spinner giả. */}
+      {/* REAL progress bar — width follows done/total, no fake spinner. */}
       <div
         className="mt-3 h-2 w-56 overflow-hidden rounded-full bg-[rgba(22,22,26,0.15)]"
         role="progressbar"
         aria-valuenow={done}
         aria-valuemin={0}
         aria-valuemax={total}
-        aria-label="Tiến độ tải skin"
+        aria-label="Skin loading progress"
         data-testid="skin-progress"
       >
         <div
@@ -121,13 +121,13 @@ function CompassLoader({ done, total }: { done: number; total: number }): React.
           style={{ width: `${pct}%` }}
         />
       </div>
-      <p className="mt-1 text-xs text-[#6b6b76]">Đợi render xong hết {total} skin rồi mới hiện lưới.</p>
+      <p className="mt-1 text-xs text-[#6b6b76]">Waiting for all {total} skins to finish rendering before showing the grid.</p>
     </div>
   );
 }
 
-/** Nút layer Skin dưới dock Pin — hiệu ứng hover như các nút khác
- *  (nổi lên + viền cam, mũi tên trượt). */
+/** Skin layer button below the Battery dock — hover effect like the other buttons
+ *  (rises up + orange border, sliding arrow). */
 export function SkinButton({ onOpen }: { onOpen: () => void }): React.JSX.Element {
   const { skinId } = useMouse();
   const cur = skinById(skinId);
@@ -135,12 +135,12 @@ export function SkinButton({ onOpen }: { onOpen: () => void }): React.JSX.Elemen
     <button
       type="button"
       onClick={onOpen}
-      aria-label="Mở bộ sưu tập skin chuột"
+      aria-label="Open mouse skin collection"
       className="dock group flex w-full items-center gap-3 px-3 py-2.5 text-left transition-all duration-150 hover:-translate-y-0.5 hover:border-[#ea580c]/60 hover:shadow-[0_8px_24px_rgba(234,88,12,0.18)] focus-visible:outline-2 focus-visible:outline-[#c2410c]"
     >
       <img src={skinThumbSrc(skinId)} alt="" className="h-12 w-12 shrink-0 object-contain" draggable={false} />
       <span className="min-w-0 flex-1">
-        <span className="block text-[11px] font-semibold tracking-[0.18em] text-[#6b6b76]">SKIN CHUỘT</span>
+        <span className="block text-[11px] font-semibold tracking-[0.18em] text-[#6b6b76]">MOUSE SKINS</span>
         <span className="block truncate text-sm font-bold text-[#16161a]">
           {cur.name} <span className="font-normal text-[#6b6b76]">· {SKINS.length} skin</span>
         </span>
@@ -155,12 +155,22 @@ export function SkinPopup({ open, onClose }: { open: boolean; onClose: () => voi
   const [pending, setPending] = useState(skinId);
   const [loaded, setLoaded] = useState(false);
   const [done, setDone] = useState(0);
-  // v3.0 virtualize: vị trí lướt hiện tại của khung lưới.
+  // v3.0 virtualize: current scroll position of the grid frame.
   const scrollRef = useRef<HTMLDivElement>(null);
   const [scrollTop, setScrollTop] = useState(0);
   const [viewH, setViewH] = useState(600);
-  // Full-res đã preload lazy (hover/focus/chọn) — mỗi skin 1 lần.
+  // Full-res already lazy-preloaded (hover/focus/select) — once per skin.
   const preloadedFull = useRef(new Set<string>());
+  // Redesign 2026-11-19 (c): rAF id for the throttled scroll handler. Declared
+  // HERE (before the `if (!open) return null` below) — a useRef/useEffect after
+  // that early return breaks the Rules of Hooks and crashes the popup.
+  const scrollRafRef = useRef<number | null>(null);
+  useEffect(
+    () => () => {
+      if (scrollRafRef.current !== null) cancelAnimationFrame(scrollRafRef.current);
+    },
+    [],
+  );
 
   const rows = useMemo(() => {
     const out: (typeof SKINS)[] = [];
@@ -168,10 +178,10 @@ export function SkinPopup({ open, onClose }: { open: boolean; onClose: () => voi
     return out;
   }, []);
 
-  // Mở popup: pending = skin đang dùng; preload THẬT toàn bộ thumb rồi
-  // mới hiện lưới. KHÔNG timeout giả nữa: Promise.all settle hết mới
-  // tắt loader — ảnh lỗi vẫn tính là xong (onerror cũng tick), nên
-  // không bao giờ kẹt ở loader.
+  // Opening the popup: pending = the skin in use; REALLY preload all thumbs, then
+  // show the grid. NO more fake timeout: the loader only turns off once Promise.all
+  // settles completely — failed images still count as done (onerror ticks too), so it
+  // never gets stuck on the loader.
   useEffect(() => {
     if (!open) return;
     setPending(skinId);
@@ -212,7 +222,7 @@ export function SkinPopup({ open, onClose }: { open: boolean; onClose: () => voi
     };
   }, [open, skinId]);
 
-  // Esc đóng popup.
+  // Esc closes the popup.
   useEffect(() => {
     if (!open) return;
     const onKey = (e: KeyboardEvent) => {
@@ -222,7 +232,7 @@ export function SkinPopup({ open, onClose }: { open: boolean; onClose: () => voi
     return () => window.removeEventListener('keydown', onKey);
   }, [open, onClose]);
 
-  // Hook cho headless test: trạng thái preload + số hàng đang render.
+  // Hook for headless tests: preload state + number of rows rendering.
   const visStart = Math.max(0, Math.floor(scrollTop / ROW_PITCH) - 2);
   const visEnd = Math.min(rows.length, Math.ceil((scrollTop + viewH) / ROW_PITCH) + 2);
   useEffect(() => {
@@ -243,8 +253,8 @@ export function SkinPopup({ open, onClose }: { open: boolean; onClose: () => voi
   const pendingSkin = skinById(pending);
   const changed = pending !== skinId;
 
-  /** Lazy full-res: chỉ tải ảnh gốc khi bro rê/chọn skin đó (đủ nét cho
-      stage sau khi Áp dụng), không tải 67 ảnh 9MB lúc mở popup. */
+  /** Lazy full-res: only downloads the original image when Ethan hovers/selects that skin (sharp enough for
+      the stage after Apply), never 67 9MB images when the popup opens. */
   const preloadFull = (s: SkinDef): void => {
     if (preloadedFull.current.has(s.id)) return;
     preloadedFull.current.add(s.id);
@@ -262,21 +272,29 @@ export function SkinPopup({ open, onClose }: { open: boolean; onClose: () => voi
       return;
     }
     setSkinId(pending);
-    addLog(`Đã đổi skin chuột: ${pendingSkin.name}.`);
+    addLog(`Mouse skin changed: ${pendingSkin.name}.`);
     onClose();
   };
 
   const unapply = () => {
     setSkinId('default');
-    addLog('Đã hủy áp dụng skin, về Mặc định.');
+    addLog('Skin reverted to Default.');
     onClose();
   };
 
+  // Redesign 2026-11-19 (c): scroll fires dozens of events per flick — one
+  // setState per event re-rendered the whole grid each time, which is the lag
+  // Ethan feels on his EliteBook. Throttle to one update per animation frame.
   const onGridScroll = (): void => {
     const el = scrollRef.current;
-    if (!el) return;
-    setScrollTop(el.scrollTop);
-    setViewH(el.clientHeight);
+    if (!el || scrollRafRef.current !== null) return;
+    scrollRafRef.current = requestAnimationFrame(() => {
+      scrollRafRef.current = null;
+      const el2 = scrollRef.current;
+      if (!el2) return;
+      setScrollTop(el2.scrollTop);
+      setViewH(el2.clientHeight);
+    });
   };
 
   return createPortal(
@@ -284,7 +302,7 @@ export function SkinPopup({ open, onClose }: { open: boolean; onClose: () => voi
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm"
       role="dialog"
       aria-modal="true"
-      aria-label="Bộ sưu tập skin chuột"
+      aria-label="Mouse skin collection"
       onClick={onClose}
     >
       <motion.div
@@ -294,33 +312,33 @@ export function SkinPopup({ open, onClose }: { open: boolean; onClose: () => voi
         className="flex max-h-[90vh] w-full max-w-[880px] flex-col overflow-hidden rounded-2xl bg-[var(--paper)] shadow-2xl"
         onClick={(e) => e.stopPropagation()}
       >
-        {/* Header cố định */}
+        {/* Fixed header */}
         <div className="flex shrink-0 items-center gap-3 border-b border-[rgba(22,22,26,0.12)] px-5 py-3">
           <div className="min-w-0 flex-1">
-            <h2 className="font-display text-xl font-semibold tracking-wide text-[#16161a]">SKIN CHUỘT</h2>
+            <h2 className="font-display text-xl font-semibold tracking-wide text-[#16161a]">MOUSE SKINS</h2>
             <p className="truncate text-xs text-[#6b6b76]">
-              {SKINS.length} skin · Đang dùng: <span className="font-semibold text-[#ea580c]">{applied.name}</span>
+              {SKINS.length} skins · In use: <span className="font-semibold text-[#ea580c]">{applied.name}</span>
             </p>
           </div>
           <button
             type="button"
             onClick={onClose}
-            aria-label="Đóng"
+            aria-label="Close"
             className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-[rgba(22,22,26,0.12)] bg-white/70 text-[#16161a] transition-colors hover:border-[#ea580c] hover:text-[#ea580c] focus-visible:outline-2 focus-visible:outline-[#c2410c]"
           >
             <X className="h-5 w-5" aria-hidden="true" />
           </button>
         </div>
 
-        {/* Lưới VIRTUALIZE (v3.0): chỉ render hàng đang thấy (+2 đệm).
-            Khung lướt là flex-item (flex-1 min-h-0) — xem fix v2.8.2. */}
+        {/* VIRTUALIZED grid (v3.0): only renders the rows currently visible (+2 buffer).
+            The scroll frame is a flex-item (flex-1 min-h-0) — see fix v2.8.2. */}
         <div className="relative flex min-h-0 flex-1 flex-col">
           <div
             ref={scrollRef}
             onScroll={onGridScroll}
             className="min-h-0 flex-1 overflow-y-auto p-4"
             role="listbox"
-            aria-label="Chọn skin chuột"
+            aria-label="Choose a mouse skin"
             data-testid="skin-grid"
           >
             <div className="relative" style={{ height: rows.length * ROW_PITCH }}>
@@ -330,7 +348,15 @@ export function SkinPopup({ open, onClose }: { open: boolean; onClose: () => voi
                   <div
                     key={ri}
                     className="absolute inset-x-0 grid grid-cols-5 gap-3"
-                    style={{ top: ri * ROW_PITCH, height: ROW_PITCH - 12 }}
+                    style={{
+                      top: ri * ROW_PITCH,
+                      height: ROW_PITCH - 12,
+                      // Redesign 2026-11-19 (c): let the browser skip rendering rows
+                      // that are off-screen (fixed 200px rows, so the intrinsic size
+                      // can't shift the scrollbar).
+                      contentVisibility: 'auto',
+                      containIntrinsicSize: '200px',
+                    }}
                   >
                     {row.map((s) => {
                       const isPending = pending === s.id;
@@ -360,7 +386,7 @@ export function SkinPopup({ open, onClose }: { open: boolean; onClose: () => voi
                         >
                           {isApplied && (
                             <span className="absolute top-1.5 left-1.5 z-10 rounded-full bg-[#ea580c] px-2 py-0.5 text-[9px] font-bold tracking-wide text-white">
-                              ĐANG DÙNG
+                              IN USE
                             </span>
                           )}
                           {isPending && (
@@ -379,7 +405,7 @@ export function SkinPopup({ open, onClose }: { open: boolean; onClose: () => voi
                               }}
                               className="mt-1 w-full rounded-full border border-[#dc2626]/40 py-1 text-[10px] font-bold text-[#dc2626] transition-colors hover:bg-[#dc2626] hover:text-white focus-visible:outline-2 focus-visible:outline-[#dc2626]"
                             >
-                              Hủy áp dụng
+                              Revert to Default
                             </button>
                           )}
                         </div>
@@ -391,7 +417,7 @@ export function SkinPopup({ open, onClose }: { open: boolean; onClose: () => voi
             </div>
           </div>
           {!loaded && (
-            <div className="skin-loading-veil absolute inset-0 z-10 flex items-center justify-center backdrop-blur-md" role="status" aria-label="Đang tải skin">
+            <div className="skin-loading-veil absolute inset-0 z-10 flex items-center justify-center backdrop-blur-md" role="status" aria-label="Loading skins">
               <div className="rounded-3xl bg-[var(--surface-solid)] px-6 shadow-xl">
                 <CompassLoader done={done} total={SKINS.length} />
               </div>
@@ -399,22 +425,22 @@ export function SkinPopup({ open, onClose }: { open: boolean; onClose: () => voi
           )}
         </div>
 
-        {/* Footer cố định */}
+        {/* Fixed footer */}
         <div className="flex shrink-0 items-center gap-3 border-t border-[rgba(22,22,26,0.12)] px-5 py-3">
           <p className="min-w-0 flex-1 truncate text-xs text-[#6b6b76]">
             {changed ? (
               <>
-                Sẽ đổi thành: <span className="font-semibold text-[#16161a]">{pendingSkin.name}</span>
+                Will change to: <span className="font-semibold text-[#16161a]">{pendingSkin.name}</span>
               </>
             ) : (
-              <>Đã chọn: {pendingSkin.name}</>
+              <>Selected: {pendingSkin.name}</>
             )}
           </p>
           <GlassButton variant="ghost" onClick={onClose}>
-            Hủy
+            Cancel
           </GlassButton>
           <GlassButton variant="primary" onClick={apply} disabled={!loaded || !changed}>
-            Áp dụng
+            Apply
           </GlassButton>
         </div>
       </motion.div>

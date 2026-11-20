@@ -1,14 +1,14 @@
 /**
- * LeftPanel v2.4 — theo ảnh 3 + yêu cầu của bro: khung navy bo tròn,
- * header "● M3", rồi NGAY DƯỚI là THANH MENU 4 mục chính (Gán phím / DPI /
- * Hiệu năng / Khác — tiếng Việt, mỗi mục có icon của nó ĐẰNG SAU label).
- * Create / Import / Onboard configuration ĐÃ XÓA khỏi đầu panel (v2.3):
- * chúng chỉ là thao tác phụ (lưu/nhập profile, xem cấu hình đang chạy) —
- * chức năng đó đã có đủ trong mục Khác → Profile (OthersPage). Bên trong
- * là nội dung tab. Activity Log ĐÃ XÓA ở v2.4 (thông báo giờ là toast
- * ngắn ở đầu trang). FIX v2.1: các khối cố định shrink-0 (Onboard từng bị
- * bóp còn 38px). FIX v2.4: bỏ AnimatePresence mode="wait" (kẹt exit sau
- * modal macro) — tab dùng key + animation CSS thuần (tabIn).
+ * LeftPanel v2.4 — per image 3 + Ethan's request: rounded navy frame,
+ * header "● M3", then RIGHT BELOW it the MENU BAR with 4 main items (Key Bindings / DPI /
+ * Performance / More — each item with its icon AFTER the label).
+ * Create / Import / Onboard configuration REMOVED from the top of the panel (v2.3):
+ * they are only side actions (save/import profiles, view the running config) —
+ * that functionality already exists in More → Profile (OthersPage). Inside
+ * is the tab content. Activity Log REMOVED in v2.4 (notifications are now short
+ * toasts at the top of the page). FIX v2.1: fixed blocks are shrink-0 (Onboard was once
+ * squeezed to 38px). FIX v2.4: removed AnimatePresence mode="wait" (exit stuck after
+ * the macro modal) — tabs use key + pure CSS animation (tabIn).
  */
 import { useState } from 'react';
 import {
@@ -27,7 +27,17 @@ import DpiPage from '../pages/DpiPage';
 import KeysPage from '../pages/KeysPage';
 import PerformancePage from '../pages/PerformancePage';
 import MacroPage from '../pages/MacroPage';
-import { FirmwareCard, BatteryCard, ProfileCard, RawReplyCard, RestoreCard } from '../pages/OthersPage';
+import {
+  AppSettingsCard,
+  BatteryBadge,
+  BatterySaverCard,
+  FirmwareBody,
+  FirmwareTag,
+  MoreSection,
+  ProfileCard,
+  RawReplyCard,
+  RestoreCard,
+} from '../pages/OthersPage';
 
 export function LeftPanel(): React.JSX.Element {
   const { tab, setTab, config, keys, restoreFactory } = useMouse();
@@ -38,7 +48,7 @@ export function LeftPanel(): React.JSX.Element {
     if (!config || !keys) return;
     const data = {
       name: 'Onboard configuration',
-      savedAt: new Date().toLocaleString('vi-VN'),
+      savedAt: new Date().toLocaleString('en-GB'),
       config,
       keys,
     };
@@ -56,9 +66,9 @@ export function LeftPanel(): React.JSX.Element {
     <section
       id="left-panel"
       className="dark-panel flex min-w-0 flex-col overflow-hidden rounded-[24px] border border-white/10 shadow-[0_20px_50px_rgba(22,22,26,0.35)] lg:h-full lg:min-h-0"
-      aria-label="Bảng điều khiển M3"
+      aria-label="M3 control panel"
     >
-      {/* Header kiểu ảnh 3 */}
+      {/* Image-3 style header */}
       <div className="flex shrink-0 items-center gap-3 border-b border-white/10 px-4 pt-4 pb-3">
         <span className="h-2.5 w-2.5 rounded-full bg-[#22c55e]" aria-hidden="true" />
         <div className="min-w-0 flex-1">
@@ -70,7 +80,7 @@ export function LeftPanel(): React.JSX.Element {
         <div className="relative">
           <button
             onClick={() => setMenuOpen((v) => !v)}
-            aria-label="Tùy chọn cấu hình"
+            aria-label="Config options"
             aria-expanded={menuOpen}
             className="flex h-[44px] w-[44px] items-center justify-center rounded-xl border border-white/10 bg-white/5 text-[#edebe6] transition hover:bg-white/10"
           >
@@ -80,7 +90,7 @@ export function LeftPanel(): React.JSX.Element {
             <>
               <button
                 className="fixed inset-0 z-10 cursor-default"
-                aria-label="Đóng menu"
+                aria-label="Close menu"
                 onClick={() => setMenuOpen(false)}
               />
               <div className="absolute right-0 z-20 mt-2 w-[240px] overflow-hidden rounded-xl border border-white/10 bg-[#262640] shadow-2xl">
@@ -91,13 +101,13 @@ export function LeftPanel(): React.JSX.Element {
                     setConfirmRestore(true);
                   }}
                 >
-                  <RotateCcw className="h-4 w-4 text-[#ff8a3d]" /> Khôi phục mặc định
+                  <RotateCcw className="h-4 w-4 text-[#ff8a3d]" /> Restore defaults
                 </button>
                 <button
                   className="flex min-h-[44px] w-full items-center gap-2 px-4 text-left text-sm text-[#edebe6] hover:bg-white/10"
                   onClick={exportJson}
                 >
-                  <Download className="h-4 w-4 text-[#ff8a3d]" /> Xuất JSON cấu hình
+                  <Download className="h-4 w-4 text-[#ff8a3d]" /> Export config JSON
                 </button>
               </div>
             </>
@@ -105,19 +115,19 @@ export function LeftPanel(): React.JSX.Element {
         </div>
       </div>
 
-      {/* Thanh menu 4 mục chính — NGAY DƯỚI header (v2.3). Create / Import /
-          Onboard đã dồn vào mục Khác → Profile (OthersPage có đủ).
-          Mỗi mục: label tiếng Việt + icon của nó ĐẰNG SAU label. */}
+      {/* Menu bar with 4 main items — RIGHT BELOW the header (v2.3). Create / Import /
+          Onboard moved into More → Profile (OthersPage has them all).
+          Each item: label + its icon AFTER the label. */}
       <nav
         className="mx-4 mt-3 flex shrink-0 overflow-hidden rounded-xl border border-white/10 bg-[#1f1f38]"
-        aria-label="Mục cấu hình"
+        aria-label="Config section"
       >
         {(
           [
-            { id: 'keys', label: 'Gán phím', icon: <Keyboard className="h-4 w-4" /> },
+            { id: 'keys', label: 'Key Bindings', icon: <Keyboard className="h-4 w-4" /> },
             { id: 'dpi', label: 'DPI', icon: <Gauge className="h-4 w-4" /> },
-            { id: 'performance', label: 'Hiệu năng', icon: <Zap className="h-4 w-4" /> },
-            { id: 'others', label: 'Khác', icon: <Settings className="h-4 w-4" /> },
+            { id: 'performance', label: 'Performance', icon: <Zap className="h-4 w-4" /> },
+            { id: 'others', label: 'More', icon: <Settings className="h-4 w-4" /> },
           ] as { id: TabId; label: string; icon: React.ReactNode }[]
         ).map(({ id, label, icon }) => {
           const active = tab === id;
@@ -139,12 +149,12 @@ export function LeftPanel(): React.JSX.Element {
         })}
       </nav>
 
-      {/* Nội dung tab — khối duy nhất được cuộn trong panel.
-          v2.4: BỎ AnimatePresence mode="wait" — nó KẸT exit sau khi mở/đóng
-          modal macro (tab đổi state nhưng content cũ không unmount, content
-          mới chất đống bên dưới → bấm Khác không đổi tab). Thay bằng
-          key={tab} + animation CSS thuần (tabIn) — không có exit tracking
-          để kẹt, mượt hơn (chỉ opacity/transform, chạy trên GPU). */}
+      {/* Tab content — the only scrollable block in the panel.
+          v2.4: REMOVED AnimatePresence mode="wait" — it STUCK the exit after opening/closing
+          the macro modal (the tab changed state but the old content didn't unmount, and new
+          content piled up below → clicking More didn't change the tab). Replaced with
+          key={tab} + pure CSS animation (tabIn) — no exit tracking
+          to get stuck, smoother (opacity/transform only, runs on the GPU). */}
       <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4">
         <div key={tab} className="tab-enter">
           {tab === 'keys' && (
@@ -159,33 +169,44 @@ export function LeftPanel(): React.JSX.Element {
           {tab === 'performance' && <PerformancePage />}
           {tab === 'others' && (
             <div>
-              <PageHead title="Khác" subtitle="Thiết bị · Pin · Firmware · Profile." />
-              {/* v2.5: 2 cột cân nhau — trái: Thiết bị & pin + Profile;
-                  phải: Firmware + Khôi phục + Raw. Không còn chồng 1 cột
-                  dài 1294px, lướt còn ~0.4 màn ở 1366x768. */}
-              <div className="grid gap-4 lg:grid-cols-2">
-                <div className="min-w-0 space-y-4">
+              <PageHead title="More" subtitle="Battery · Firmware · Profiles · Settings · Restore · Raw." />
+              {/* Redesign 2026-11-19 (a): single-column stack, Battery FIRST, every
+                  section collapsible in a Firmware-card blue-glass frame. Battery +
+                  Firmware open by default; open/closed persists per section. */}
+              <div className="space-y-4">
+                <MoreSection id="battery" eyebrow="Battery" title="Battery" badge={<BatteryBadge />}>
                   <Dashboard bare />
+                  <div className="mt-4">
+                    <BatterySaverCard />
+                  </div>
+                </MoreSection>
+                <MoreSection id="firmware" eyebrow="Firmware · duyzoz" title={<FirmwareTag />}>
+                  <FirmwareBody />
+                </MoreSection>
+                <MoreSection id="profiles" eyebrow="Profiles" title="Profiles">
                   <ProfileCard />
-                </div>
-                <div className="min-w-0 space-y-4">
-                  <FirmwareCard />
-                  <BatteryCard />
+                </MoreSection>
+                <MoreSection id="settings" eyebrow="Settings" title="Settings">
+                  <AppSettingsCard />
+                </MoreSection>
+                <MoreSection id="restore" eyebrow="Restore" title="Restore defaults">
                   <RestoreCard />
+                </MoreSection>
+                <MoreSection id="raw" eyebrow="Raw" title="Latest raw reply">
                   <RawReplyCard />
-                </div>
+                </MoreSection>
               </div>
             </div>
           )}
         </div>
       </div>
 
-      {/* Activity Log ĐÃ XÓA ở v2.4 (theo yêu cầu bro) — mọi thông báo giờ
-          là toast NGẮN ở đầu trang (Toasts), không còn dòng log trong panel. */}
+      {/* Activity Log REMOVED in v2.4 (per Ethan's request) — every notification is now a
+          SHORT toast at the top of the page (Toasts), no more log lines in the panel. */}
       <ConfirmModal
         open={confirmRestore}
-        title="Khôi phục mặc định gốc?"
-        confirmLabel="Khôi phục"
+        title="Restore factory defaults?"
+        confirmLabel="Restore"
         danger
         onConfirm={() => {
           setConfirmRestore(false);
@@ -193,8 +214,8 @@ export function LeftPanel(): React.JSX.Element {
         }}
         onCancel={() => setConfirmRestore(false)}
       >
-        Ghi lại cấu hình mặc định của app gốc (DPI 800/1600/2400/3200/6400/12000, nấc 2, polling index 3, ngủ 10
-        phút) + phím mặc định xuống chuột.
+        Writes the original app's default config (DPI 800/1600/2400/3200/6400/12000, stage 2, polling index 3, sleep 10
+        min) + default keys to the mouse.
       </ConfirmModal>
     </section>
   );

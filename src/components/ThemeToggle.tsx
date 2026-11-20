@@ -1,21 +1,21 @@
 /**
  * ThemeToggle v3.0.1 — UIVERSE "Switch" by mamyapro123 (Hari Bro), MIT.
  * Source: https://uiverse.io/mamyapro123/cuddly-warthog-66
- * HTML VERBATIM từ src/components/uiverse/THEME-SWITCH.html (final stable
- * --toggle-size: 32px); CSS VERBATIM ở cuối src/index.css. Chỉ adapt
- * --toggle-size inline (14px) cho vừa góc khung quản lý — container
- * 5.625em x 2.5em = ~79x35px. Ethan 2026-11-08 21:54: bản 20px (112x50)
- * QUÁ TO, che hết — thu xuống 14px.
- * Checkbox checked = DARK mode (đêm/mặt trăng). SVG defs (filters
- * #sketchy / #sketchy-sm) render 1 lần duy nhất qua <ThemeSwitchDefs />
- * ở App root — CSS reference url(#sketchy).
- * Theme đổi thì app root TRÔI màu 0.5s + dải sáng sweep (xem App.tsx),
- * không đổi tức thì.
+ * HTML VERBATIM from src/components/uiverse/THEME-SWITCH.html (final stable
+ * --toggle-size: 32px); CSS VERBATIM at the end of src/index.css. Only adapt
+ * --toggle-size inline (14px) to fit the management frame corner — container
+ * 5.625em x 2.5em = ~79x35px. Ethan 2026-11-08 21:54: the 20px version (112x50) was
+ * TOO BIG, covering everything — shrunk to 14px.
+ * Checkbox checked = DARK mode (night/moon). SVG defs (filters
+ * #sketchy / #sketchy-sm) render once only via <ThemeSwitchDefs />
+ * at the App root — CSS references url(#sketchy).
+ * When the theme changes, the app root GLIDES colors over 0.5s + a light sweep band (see App.tsx),
+ * never an instant switch.
  */
 import type { CSSProperties } from 'react';
 import { useMouse } from '../store';
 
-/** SVG defs ẩn — render 1 lần duy nhất trong document (App root). */
+/** Hidden SVG defs — rendered once only in the document (App root). */
 export function ThemeSwitchDefs(): React.JSX.Element {
   return (
     <>
@@ -38,23 +38,23 @@ export function ThemeSwitchDefs(): React.JSX.Element {
 export function ThemeToggle(): React.JSX.Element {
   const { theme, toggleTheme } = useMouse();
   const dark = theme === 'dark';
-  // Kích thước thật của pill = container 5.625em x 2.5em = 78.75x35px ở
-  // --toggle-size 14px. Label gốc chỉ 14x14, container tràn ra ngoài
-  // label theo margin âm (-10.5px) — wrapper giữ đúng footprint 79x35
-  // (label absolute tại 10.5,10.5) để pill không đè lên nút bên cạnh.
-  // Đây chỉ là khung chứa, không sửa code Uiverse bên trong.
-  // --toggle-size PHẢI đặt inline TRÊN CHÍNH <label>: CSS verbatim tự
-  // khai --toggle-size: 32px trên .theme-switch, nên giá trị kế thừa từ
-  // wrapper bị luật của chính label đè mất (bản 3.0.0 đo thật vẫn 180x80
-  // dù wrapper ghi 20px — Ethan báo quá to là đúng).
+  // The pill's real size = container 5.625em x 2.5em = 78.75x35px at
+  // --toggle-size 14px. The original label is only 14x14, the container overflows
+  // the label via negative margin (-10.5px) — the wrapper keeps the exact 79x35 footprint
+  // (label absolute at 10.5,10.5) so the pill doesn't cover the button next to it.
+  // This is only the wrapper, the Uiverse code inside is untouched.
+  // --toggle-size MUST be set inline ON THE <label> itself: the verbatim CSS
+  // declares --toggle-size: 32px on .theme-switch, so an inherited value from the
+  // wrapper is overridden by the label's own rule (v3.0.0 still measured 180x80
+  // even with 20px on the wrapper — Ethan was right that it was too big).
   return (
     <span
-      className="relative block h-[35px] w-[79px] shrink-0"
-      title={dark ? 'Chế độ tối — bấm để sang sáng' : 'Chế độ sáng — bấm để sang tối'}
+      className="relative block h-[35px] w-[79px] shrink-0 overflow-hidden rounded-full"
+      title={dark ? 'Dark mode — click for light' : 'Light mode — click for dark'}
     >
       <span className="absolute" style={{ left: 10.5, top: 10.5, display: 'block' }}>
         <label className="theme-switch" style={{ '--toggle-size': '14px' } as CSSProperties}>
-          <input className="theme-switch__checkbox" type="checkbox" checked={dark} onChange={toggleTheme} aria-label="Chuyển chế độ sáng / tối" />
+          <input className="theme-switch__checkbox" type="checkbox" checked={dark} onChange={toggleTheme} aria-label="Switch light / dark mode" />
   <div className="theme-switch__container">
     <div className="theme-switch__clouds"></div>
     <div className="theme-switch__stars-container">
