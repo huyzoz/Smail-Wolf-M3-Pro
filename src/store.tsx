@@ -297,35 +297,52 @@ export function MouseProvider({ children }: { children: ReactNode }): React.JSX.
   const busyRef = useRef(false);
   const toastId = useRef(0);
 
+  // W9 — one place owns the toast exit timing. addLog + pushToast used to
+  // carry identical nested setTimeout pairs (4500ms → mark exiting → 250ms →
+  // remove); dismissToast had the second half again. All three go through
+  // these two helpers now; behaviour is unchanged (W6 two-step exit).
+  const removeToastAfterExit = useCallback((id: number) => {
+    setTimeout(() => setToasts((prev) => prev.filter((t) => t.id !== id)), 250);
+  }, []);
+  const scheduleToastExit = useCallback(
+    (id: number, delayMs: number) => {
+      setTimeout(() => {
+        setToasts((prev) => prev.map((t) => (t.id === id ? { ...t, exiting: true } : t)));
+        removeToastAfterExit(id);
+      }, delayMs);
+    },
+    [removeToastAfterExit],
+  );
+
   // v2.4: Activity Log REMOVED (per Ethan's request) — every notification is now a
   // SHORT toast at the top of the page. addLog keeps its name (many callers) but
   // now pushes one short info toast and no longer keeps a log list.
-  const addLog = useCallback((text: string) => {
-    const id = ++toastId.current;
-    setToasts((prev) => [...prev.slice(-2), { id, kind: 'info', text }]);
-    // W6: exit is two steps — mark `exiting` (CSS fades it out over 250ms),
-    // then remove it. Was a single filter at 4500ms (framer exit).
-    setTimeout(() => {
-      setToasts((prev) => prev.map((t) => (t.id === id ? { ...t, exiting: true } : t)));
-      setTimeout(() => setToasts((prev) => prev.filter((t) => t.id !== id)), 250);
-    }, 4500);
-  }, []);
+  const addLog = useCallback(
+    (text: string) => {
+      const id = ++toastId.current;
+      setToasts((prev) => [...prev.slice(-2), { id, kind: 'info', text }]);
+      scheduleToastExit(id, 4500);
+    },
+    [scheduleToastExit],
+  );
 
-  const pushToast = useCallback((kind: Toast['kind'], text: string) => {
-    const id = ++toastId.current;
-    setToasts((prev) => [...prev, { id, kind, text }]);
-    // W6: two-step exit, same as addLog above.
-    setTimeout(() => {
-      setToasts((prev) => prev.map((t) => (t.id === id ? { ...t, exiting: true } : t)));
-      setTimeout(() => setToasts((prev) => prev.filter((t) => t.id !== id)), 250);
-    }, 4500);
-  }, []);
+  const pushToast = useCallback(
+    (kind: Toast['kind'], text: string) => {
+      const id = ++toastId.current;
+      setToasts((prev) => [...prev, { id, kind, text }]);
+      scheduleToastExit(id, 4500);
+    },
+    [scheduleToastExit],
+  );
 
-  const dismissToast = useCallback((id: number) => {
-    // W6: two-step exit — mark, fade 250ms, then remove.
-    setToasts((prev) => prev.map((t) => (t.id === id ? { ...t, exiting: true } : t)));
-    setTimeout(() => setToasts((prev) => prev.filter((t) => t.id !== id)), 250);
-  }, []);
+  const dismissToast = useCallback(
+    (id: number) => {
+      // W6: two-step exit — mark, fade 250ms, then remove.
+      setToasts((prev) => prev.map((t) => (t.id === id ? { ...t, exiting: true } : t)));
+      removeToastAfterExit(id);
+    },
+    [removeToastAfterExit],
+  );
 
   const applyFullRead = useCallback((r: FullRead, isWired: boolean) => {
     setVersion(r.version);
