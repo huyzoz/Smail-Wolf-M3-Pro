@@ -1,10 +1,11 @@
 /**
  * More — redesign 2026-11-19 (a): single-column stack of collapsible sections,
- * Battery FIRST, then Firmware, Profiles, Settings, Restore, Raw. Every section
- * is a blue-glass frame like the old Firmware card (.uiv-blueglass) with a
- * header button (title + chevron); open/closed persists per section in
- * localStorage (smailwolf_m3pro_more_sections_v1). Battery + Firmware open by
- * default, the rest closed.
+ * Battery FIRST, Firmware LAST (v3.0.11), Profiles, Settings, Restore, Raw in
+ * between. Every section is a blue-glass frame like the old Firmware card
+ * (.uiv-blueglass) with a header button (title + chevron); open/closed persists
+ * per section in localStorage (smailwolf_m3pro_more_sections_v1). Battery +
+ * Firmware open by default, the rest closed. v3.0.11: each section has its own
+ * colour (data-tone) instead of all blue.
  *
  * Firmware section (o): "View source" opens the repo, "What's new?" opens a
  * wide (landscape) modal with the full release-notes log of the latest version.
@@ -79,7 +80,9 @@ function useMoreSectionOpen(id: MoreSectionId): [boolean, () => void] {
 }
 
 /** One collapsible section: Firmware-card blue glass (.uiv-blueglass) with a
- *  header button (mono eyebrow + title + optional live badge + chevron). */
+ *  header button (mono eyebrow + title + optional live badge + chevron).
+ *  v3.0.11: one colour per section (data-tone = the section id) instead of
+ *  the same blue everywhere — the gradient comes from index.css. */
 export function MoreSection({
   id,
   eyebrow,
@@ -95,7 +98,7 @@ export function MoreSection({
 }): React.JSX.Element {
   const [open, toggle] = useMoreSectionOpen(id);
   return (
-    <div className="uiv-blueglass">
+    <div className="uiv-blueglass" data-tone={id}>
       <button
         type="button"
         onClick={toggle}
@@ -224,7 +227,13 @@ export function FirmwareBody(): React.JSX.Element {
   // The version tag lives in the section header (FirmwareTag); this is the body only.
   // v3.0.9 — the Update button opens the AppUpdateGate's shared download →
   // progress → wipe flow through the store; no own copy of that flow here.
-  const { startAppUpdate } = useMouse();
+  const { startAppUpdate, pushToast } = useMouse();
+  // v3.0.11 — "View source" did nothing on Ethan's machine with no message:
+  // the opener functions now throw on failure, and every open here shows
+  // the real reason + URL in an error toast instead of failing silently.
+  const openWithToast = (fn: () => Promise<void>): void => {
+    void fn().catch((e: unknown) => pushToast('err', e instanceof Error ? e.message : String(e)));
+  };
   // v3.0.2 — checks for updates of THIS app itself from the GitHub repo
   // (duyzoz/Smail-Wolf-M3-Pro). undefined = checking, null = could not
   // check (offline — stays silent, no error shown).
@@ -276,7 +285,7 @@ export function FirmwareBody(): React.JSX.Element {
 
   const sourceButtons = (
     <>
-      <GlassButton variant="ghost" onClick={() => void openRepoPage()}>
+      <GlassButton variant="ghost" onClick={() => openWithToast(openRepoPage)}>
         <Code className="h-4 w-4" /> View source
       </GlassButton>
       <GlassButton variant="ghost" onClick={openWhatsNew}>
@@ -328,7 +337,7 @@ export function FirmwareBody(): React.JSX.Element {
               <GlassButton variant="primary" onClick={startAppUpdate}>
                 <Download className="h-4 w-4" /> Update
               </GlassButton>
-              <GlassButton variant="ghost" onClick={() => void openReleasePage(update)}>
+              <GlassButton variant="ghost" onClick={() => openWithToast(() => openReleasePage(update))}>
                 View on GitHub
               </GlassButton>
               {sourceButtons}
