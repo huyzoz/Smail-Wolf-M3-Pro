@@ -145,6 +145,10 @@ interface MouseStore {
   simulateDpiPush: () => void;
   listenDpiPush: () => void;
   addLog: (text: string) => void;
+  /** v3.0.11 — show a toast (kind 'ok' | 'info' | 'err'). Exposed so UI
+   *  surfaces can report failures themselves (e.g. the Firmware section's
+   *  "View source" when the system browser won't open). */
+  pushToast: (kind: Toast['kind'], text: string) => void;
   dismissToast: (id: number) => void;
 }
 
@@ -873,7 +877,7 @@ export function MouseProvider({ children }: { children: ReactNode }): React.JSX.
       registerUpdateStarter, startAppUpdate,
       readBatteryNow,
       saveConfig, saveKeys, writeMacros, setMacros, saveProfile, applyProfile,
-      deleteProfile, restoreFactory, simulateDpiPush, listenDpiPush, addLog, dismissToast,
+      deleteProfile, restoreFactory, simulateDpiPush, listenDpiPush, addLog, pushToast, dismissToast,
     }),
     [
       mode, connected, connecting, loading, theme, toggleTheme, lite, toggleLite, busy, wired, deviceLabel, version, mouseName,
@@ -884,7 +888,7 @@ export function MouseProvider({ children }: { children: ReactNode }): React.JSX.
       registerUpdateStarter, startAppUpdate,
       readBatteryNow,
       saveConfig, saveKeys, writeMacros, setMacros, saveProfile, applyProfile,
-      deleteProfile, restoreFactory, simulateDpiPush, listenDpiPush, addLog, dismissToast,
+      deleteProfile, restoreFactory, simulateDpiPush, listenDpiPush, addLog, pushToast, dismissToast,
     ],
   );
 

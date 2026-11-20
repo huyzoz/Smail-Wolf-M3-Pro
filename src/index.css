@@ -1987,6 +1987,88 @@ html[data-theme="dark"] .uiv-btn-ghost:hover:not(:disabled) {
   .conn-icon { transition: none; }
 }
 
+/* ---------- V3.0.11: connection-cluster Color Bar Sweep (TopBar) ----------
+   Cycle (JS-driven phases, data-sweep on the pill): sweep-in 0.9s L→R
+   (decelerate, power2.out) → text 2.2s → sweep-out 0.6s R→L (accelerate,
+   power2.in, ~65% of enter). Band = 3 overlapping strips, ui-ux-pro-max
+   gaming palette: violet #7C3AED → rose #F43F5E → brand orange #EA580C.
+   Band is 150% of the pill so mid-sweep it covers all 3 icons at once.
+   Text labels fade in blur 6px → sharp, staggered 40ms; the active mode
+   is orange + bold + glow. Transform/opacity only — never blocks input.
+   Reduced motion: the cycle never starts (JS), and the animations are
+   killed here too as a backstop. */
+.conn-sweep-band {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  width: 150%;
+  display: flex;
+  pointer-events: none;
+  z-index: 2;
+  animation: conn-sweep-in 0.9s cubic-bezier(0.25, 0.46, 0.45, 0.94) both;
+}
+.conn-sweep-band-out {
+  animation: conn-sweep-out 0.6s cubic-bezier(0.55, 0.06, 0.68, 0.19) both;
+}
+@keyframes conn-sweep-in {
+  from { transform: translateX(-101%); }
+  to { transform: translateX(101%); }
+}
+@keyframes conn-sweep-out {
+  from { transform: translateX(101%); }
+  to { transform: translateX(-101%); }
+}
+.conn-sweep-strip {
+  flex: 1;
+  height: 100%;
+}
+.conn-sweep-strip-1 { background: linear-gradient(90deg, #7c3aed, #a78bfa); }
+.conn-sweep-strip-2 {
+  background: linear-gradient(90deg, #f43f5e, #fb7185);
+  margin-left: -14px;
+}
+.conn-sweep-strip-3 {
+  background: linear-gradient(90deg, #ea580c, #ff8a3d);
+  margin-left: -14px;
+}
+.conn-mode-text {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  white-space: nowrap;
+}
+.conn-mode-label {
+  font-size: 11px;
+  font-weight: 600;
+  color: rgba(85, 85, 92, 0.55);
+  animation: conn-label-in 0.35s ease-out both;
+}
+.conn-mode-text .conn-mode-label:nth-child(2) { animation-delay: 40ms; }
+.conn-mode-text .conn-mode-label:nth-child(3) { animation-delay: 80ms; }
+@keyframes conn-label-in {
+  from { opacity: 0; filter: blur(6px); }
+  to { opacity: 1; filter: blur(0); }
+}
+.conn-mode-active {
+  color: #ea580c;
+  font-weight: 800;
+  text-shadow: 0 0 8px rgba(234, 88, 12, 0.45);
+}
+@media (prefers-reduced-motion: reduce) {
+  .conn-sweep-band, .conn-mode-label { animation: none; }
+}
+
+/* ---------- V3.0.11: one colour per More section (data-tone) ----------
+   The glass look stays, only the hue changes. Header gradients use the
+   darker stop first so the white bold title keeps ≥4.5:1 contrast. */
+.uiv-blueglass[data-tone="battery"] { background: linear-gradient(10deg, #0369a1 0%, #0284c7 100%); }
+.uiv-blueglass[data-tone="firmware"] { background: linear-gradient(10deg, #c2410c 0%, #ea580c 100%); }
+.uiv-blueglass[data-tone="profiles"] { background: linear-gradient(10deg, #6d28d9 0%, #7c3aed 100%); }
+.uiv-blueglass[data-tone="settings"] { background: linear-gradient(10deg, #047857 0%, #059669 100%); }
+.uiv-blueglass[data-tone="restore"] { background: linear-gradient(10deg, #be123c 0%, #f43f5e 100%); }
+.uiv-blueglass[data-tone="raw"] { background: linear-gradient(10deg, #334155 0%, #475569 100%); }
+
 /* ---------- W4 (v3.0.8): Lite mode — html.lite ----------
    Turns off all background blur to lighten the GPU on weak PCs. All overlays already have a solid translucent
    background (bg-black/60, bg-[#17172b]/95, bg-[#0b0b26]/85), so dropping blur still reads

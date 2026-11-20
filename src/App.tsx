@@ -237,7 +237,7 @@ function Root(): React.JSX.Element {
 // On success the Rust side quits the whole process, so finishUpdate() never
 // resolves — no success UI is needed here.
 function AppUpdateGate(): React.JSX.Element | null {
-  const { loading, registerUpdateStarter } = useMouse();
+  const { loading, registerUpdateStarter, pushToast } = useMouse();
   const [info, setInfo] = useState<AppUpdateInfo | null>(null);
   const [toastOpen, setToastOpen] = useState(false);
   const [modalOpen, setModalOpen] = useState(false);
@@ -457,7 +457,11 @@ function AppUpdateGate(): React.JSX.Element | null {
               </button>
               <button
                 type="button"
-                onClick={() => void openReleasePage(info)}
+                onClick={() =>
+                  void openReleasePage(info).catch((e: unknown) =>
+                    pushToast('err', e instanceof Error ? e.message : String(e)),
+                  )
+                }
                 className="min-h-[44px] rounded-xl border border-white/15 bg-white/5 px-4 text-sm font-semibold text-white/85 transition hover:bg-white/10"
               >
                 Open on GitHub
