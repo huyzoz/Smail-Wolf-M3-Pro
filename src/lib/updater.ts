@@ -27,7 +27,7 @@ import { openUrl } from '@tauri-apps/plugin-opener';
 export const APP_REPO = 'duyzoz/Smail-Wolf-M3-Pro';
 const LATEST_RELEASE_API = `https://api.github.com/repos/${APP_REPO}/releases/latest`;
 /** Fallback when getVersion() is unavailable (plain browser / dev). Bump with releases. */
-export const FALLBACK_APP_VERSION = '3.0.11';
+export const FALLBACK_APP_VERSION = '3.0.12';
 
 export interface AppUpdateInfo {
   available: boolean;
