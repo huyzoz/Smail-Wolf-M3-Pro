@@ -263,6 +263,29 @@ tests/
 
 ## Changelog
 
+## v3.0.13 — View source actually opens the browser (2026-11-20)
+
+Ethan's live verdict on v3.0.12: clicking "View source" showed four error
+toasts — "Could not open the browser … Not allowed to open url". That toast
+was the v3.0.11 fix working as designed (the old silent failure now reports
+its real reason), and the reason pointed straight at the root cause:
+
+1. **Root cause, proven in the plugin source** — `tauri-plugin-opener`
+   2.7.3 checks every URL against its scope before opening it
+   (`commands.rs:36`, `is_url_allowed`), and returns
+   "Not allowed to open url" when nothing matches. The bare
+   `opener:allow-open-url` permission carries **no scope of its own**, so
+   the allowed list was empty and every URL was denied — including the
+   GitHub links from "View source", "What's new?" and the update flow.
+2. **Fix** — `src-tauri/capabilities/default.json` now also grants
+   `opener:allow-default-urls`, the plugin's own permission whose scope
+   allows `mailto:*`, `tel:*`, `http://*` and `https://*` with the default
+   application. One line, no code change, no new plugin.
+
+Verified in the sandbox: tsc clean, 154/154 tests. The real open path
+proves itself only on Ethan's machine — "View source" should now open
+github.com in the default browser instead of showing the toast.
+
 ## v3.0.12 — timer audit: one toast exit, sweep pauses when hidden (2026-11-20)
 
 Wave 9 of the 19-wave overhaul — a full audit of every timer in the app,
