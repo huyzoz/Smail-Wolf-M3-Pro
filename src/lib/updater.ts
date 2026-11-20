@@ -27,7 +27,7 @@ import { openUrl } from '@tauri-apps/plugin-opener';
 export const APP_REPO = 'duyzoz/Smail-Wolf-M3-Pro';
 const LATEST_RELEASE_API = `https://api.github.com/repos/${APP_REPO}/releases/latest`;
 /** Fallback when getVersion() is unavailable (plain browser / dev). Bump with releases. */
-export const FALLBACK_APP_VERSION = '3.0.10';
+export const FALLBACK_APP_VERSION = '3.0.11';
 
 export interface AppUpdateInfo {
   available: boolean;
@@ -202,32 +202,43 @@ export async function finishUpdate(info: AppUpdateInfo, wipe: boolean): Promise<
 
 /** Open the setup installer download (falls back to the release page).
  *  Kept as the fallback for "Open on GitHub" — the primary update path
- *  is downloadUpdate() above, which does not depend on the browser. */
+ *  is downloadUpdate() above, which does not depend on the browser.
+ *  v3.0.11: NEVER fails silently — if the system opener rejects, the
+ *  window.open fallback is still tried, but the caller is told with the
+ *  real reason + URL so it can show an error toast (Ethan's "View source"
+ *  click did nothing on his machine with no message at all). */
 export async function openUpdateSetup(info: AppUpdateInfo): Promise<void> {
   const url = info.setupUrl ?? info.releaseUrl;
   try {
     await openUrl(url);
-  } catch {
+  } catch (e) {
     window.open(url, '_blank', 'noopener,noreferrer');
+    throw new Error(`Could not open the browser for ${url}: ${e instanceof Error ? e.message : String(e)}`);
   }
 }
 
-/** Open the release page in the system browser. */
+/** Open the release page in the system browser. v3.0.11: throws on
+ *  opener failure (see openUpdateSetup) instead of failing silently. */
 export async function openReleasePage(info: AppUpdateInfo): Promise<void> {
   try {
     await openUrl(info.releaseUrl);
-  } catch {
+  } catch (e) {
     window.open(info.releaseUrl, '_blank', 'noopener,noreferrer');
+    throw new Error(
+      `Could not open the browser for ${info.releaseUrl}: ${e instanceof Error ? e.message : String(e)}`,
+    );
   }
 }
 
-/** Open the repo (source code) in the system browser. */
+/** Open the repo (source code) in the system browser. v3.0.11: throws on
+ *  opener failure (see openUpdateSetup) instead of failing silently. */
 export async function openRepoPage(): Promise<void> {
   const url = `https://github.com/${APP_REPO}`;
   try {
     await openUrl(url);
-  } catch {
+  } catch (e) {
     window.open(url, '_blank', 'noopener,noreferrer');
+    throw new Error(`Could not open the browser for ${url}: ${e instanceof Error ? e.message : String(e)}`);
   }
 }
 
