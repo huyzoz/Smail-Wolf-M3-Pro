@@ -150,7 +150,7 @@ eq('keyName volume up', keyName(48, 233, 0, 0), 'Media: Volume +');
 eq('keyName mute', keyName(48, 226, 0, 0), 'Media: Mute');
 eq('keyName play/pause', keyName(48, 205, 0, 0), 'Media: Play/Pause');
 eq('keyName calculator', keyName(48, 146, 1, 0), 'Media: Calculator');
-eq('keyName disable', keyName(16, 0, 0, 0), '(trống)');
+eq('keyName disable', keyName(16, 0, 0, 0), '(empty)');
 eq('keyName ctrl+v', keyName(16, 1, 25, 0), 'Keyboard: Ctrl+V');
 eq('keyName dpi', keyName(33, 85, 0, 0), 'DPI button');
 
