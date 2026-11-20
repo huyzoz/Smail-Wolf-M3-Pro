@@ -1,12 +1,12 @@
 /**
- * Macro v2.5 — gọn, ít chữ (theo yêu cầu bro: bản cũ nhiều chữ đến nỗi
- * nút tụt xuống 1 dòng, UI xấu):
- * - Danh sách compact + 2 nút ngắn ("+ Tạo macro", "Ghi xuống chuột").
- * - Bấm "Tạo macro" / sửa 1 macro → POPUP MODAL giữa màn hình, làm mờ
- *   hết phía sau (backdrop-blur), editor nằm trong đó. Đóng modal là xong.
- * - v2.5: modal mở thì khóa lướt nền (useScrollLock) — popup cố định 1
- *   chỗ, nền sau cấm lướt.
- * - Macro chỉ lưu ở máy và ghi xuống chuột — không đọc lại được.
+ * Macro v2.5 — compact, little text (per Ethan's request: the old version had so much text that
+ * the buttons dropped to a second line, ugly UI):
+ * - Compact list + 2 short buttons ("+ Create macro", "Write to mouse").
+ * - Clicking "Create macro" / editing a macro → MODAL POPUP in the middle of the screen, blurring
+ *   everything behind (backdrop-blur), the editor lives inside it. Closing the modal is done.
+ * - v2.5: an open modal locks background scrolling (useScrollLock) — the popup stays fixed in
+ *   place, the background behind must not scroll.
+ * - Macros are only stored on this PC and written to the mouse — they cannot be read back.
  */
 import { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
@@ -16,9 +16,9 @@ import { useMouse } from '../store';
 import { ConfirmModal, EmptyState, FieldLabel, GlassButton, GlassCard, PageHead, useScrollLock } from '../components/ui';
 
 function actionLabel(a: MacroAction): string {
-  if (a.kind === 'key') return `${a.action === 'keydown' ? 'Nhấn' : 'Nhả'} ${keyName(16, 0, a.code, 0).replace('Keyboard: ', '')}`;
-  if (a.kind === 'mouse') return `${a.action === 'mousedown' ? 'Bấm chuột' : 'Nhả chuột'} nút ${a.button}`;
-  return `Chờ ${a.delayMs} ms`;
+  if (a.kind === 'key') return `${a.action === 'keydown' ? 'Press' : 'Release'} ${keyName(16, 0, a.code, 0).replace('Keyboard: ', '')}`;
+  if (a.kind === 'mouse') return `${a.action === 'mousedown' ? 'Click' : 'Release'} mouse button ${a.button}`;
+  return `Wait ${a.delayMs} ms`;
 }
 
 export default function MacroPage(): React.JSX.Element {
@@ -47,22 +47,22 @@ export default function MacroPage(): React.JSX.Element {
     setRecording(false);
   };
 
-  // v2.5: modal mở thì khóa lướt nền — popup cố định 1 chỗ.
+  // v2.5: an open modal locks background scrolling — the popup stays fixed in place.
   useScrollLock(editingId !== null);
 
   const saveCurrent = (): void => {
     if (!editingId) return;
-    const trimmed = name.trim() || 'Macro không tên';
+    const trimmed = name.trim() || 'Untitled macro';
     const def: MacroDef = { id: editingId, name: trimmed, actions: steps };
     const next = macros.some((m) => m.id === editingId)
       ? macros.map((m) => (m.id === editingId ? def : m))
       : [...macros, def];
     setMacros(next);
-    addLog(`Đã lưu macro "${trimmed}" (${steps.length} bước).`);
+    addLog(`Macro "${trimmed}" saved (${steps.length} steps).`);
     closeEditor();
   };
 
-  // Record mode: chỉ ghi khi modal mở + đang ghi — bấm phím thật thành bước.
+  // Record mode: only records while the modal is open + recording — a real key press becomes a step.
   useEffect(() => {
     if (!recording || !editingId) return;
     const down = (e: KeyboardEvent): void => {
@@ -90,14 +90,14 @@ export default function MacroPage(): React.JSX.Element {
 
   return (
     <div>
-      <PageHead title="Macro" subtitle="Lưu ở máy, ghi xuống chuột. Không đọc lại được." />
+      <PageHead title="Macro" subtitle="Stored on this PC, written to the mouse. Cannot be read back." />
       <GlassCard>
         <div className="mb-3 flex items-center justify-between gap-2">
-          <h3 className="text-[15px] font-semibold text-[#edebe6]">Danh sách macro</h3>
+          <h3 className="text-[15px] font-semibold text-[#edebe6]">Macro list</h3>
           <span className="text-xs text-[#a2a2b0]">{macros.length} macro</span>
         </div>
         {macros.length === 0 ? (
-          <EmptyState text="Chưa có macro nào." />
+          <EmptyState text="No macros yet." />
         ) : (
           <div className="space-y-2">
             {macros.map((m, i) => (
@@ -109,12 +109,12 @@ export default function MacroPage(): React.JSX.Element {
                   <button onClick={() => openEdit(m)} className="min-w-0 flex-1 text-left">
                     <div className="truncate text-sm font-semibold text-white">{m.name}</div>
                     <div className="text-[11px] text-[#a2a2b0]">
-                      Macro #{i} · {m.actions.length} bước
+                      Macro #{i} · {m.actions.length} steps
                     </div>
                   </button>
                   <button
                     onClick={() => setConfirmDelete(m.id)}
-                    aria-label={`Xóa macro ${m.name}`}
+                    aria-label={`Delete macro ${m.name}`}
                     className="flex h-[40px] w-[40px] shrink-0 items-center justify-center rounded-lg text-red-300 hover:bg-red-400/10"
                   >
                     <Trash2 className="h-4 w-4" />
@@ -126,7 +126,7 @@ export default function MacroPage(): React.JSX.Element {
         )}
         <div className="mt-4 flex gap-2">
           <GlassButton onClick={startNew} className="flex-1">
-            <Plus className="h-4 w-4" /> Tạo macro
+            <Plus className="h-4 w-4" /> Create macro
           </GlassButton>
           <GlassButton
             variant="ghost"
@@ -134,46 +134,46 @@ export default function MacroPage(): React.JSX.Element {
             disabled={macros.length === 0 || busy || !connected}
             className="flex-1"
           >
-            <Play className="h-4 w-4" /> {mode === 'demo' ? 'Ghi (mô phỏng)' : 'Ghi xuống chuột'}
+            <Play className="h-4 w-4" /> {mode === 'demo' ? 'Write (simulated)' : 'Write to mouse'}
           </GlassButton>
         </div>
       </GlassCard>
 
-      {/* Modal sửa/tạo macro — làm mờ hết phía sau (theo yêu cầu bro).
-          v2.6: PORTAL ra document.body (cùng lý do ConfirmModal — Shell
-          giữ transform .app-enter nên fixed inset-0 chỉ phủ khung Shell,
-          2 mép ngoài không mờ). */}
+      {/* Create/edit macro modal — blurs everything behind (per Ethan's request).
+          v2.6: PORTAL to document.body (same reason as ConfirmModal — the Shell
+          holds the .app-enter transform, so fixed inset-0 only covers the Shell frame,
+          and the 2 outer edges stay unblurred). */}
       {editingId !== null &&
         createPortal(
           <div
             className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm"
             role="dialog"
             aria-modal="true"
-            aria-label={editing ? 'Sửa macro' : 'Macro mới'}
+            aria-label={editing ? 'Edit macro' : 'New macro'}
             onClick={closeEditor}
           >
           <div
             className="panel-card max-h-[85vh] w-full max-w-lg overflow-y-auto p-6"
             onClick={(e) => e.stopPropagation()}
           >
-            <h3 className="text-lg font-bold text-[#edebe6]">{editing ? 'Sửa macro' : 'Macro mới'}</h3>
+            <h3 className="text-lg font-bold text-[#edebe6]">{editing ? 'Edit macro' : 'New macro'}</h3>
             <div className="mt-4 space-y-4">
               <div>
-                <FieldLabel>Tên macro</FieldLabel>
+                <FieldLabel>Macro name</FieldLabel>
                 <input
                   value={name}
                   onChange={(e) => setName(e.target.value)}
-                  aria-label="Tên macro"
+                  aria-label="Macro name"
                   className="w-full rounded-xl border border-white/15 bg-black/30 px-4 py-3 text-sm text-white"
-                  placeholder="VD: Mở Chrome + dán"
+                  placeholder="e.g. Open Chrome + paste"
                 />
               </div>
 
               <div>
-                <FieldLabel>Các bước ({steps.length})</FieldLabel>
+                <FieldLabel>Steps ({steps.length})</FieldLabel>
                 {steps.length === 0 ? (
                   <p className="rounded-xl border border-dashed border-white/15 p-4 text-sm text-[#a2a2b0]">
-                    Chưa có bước nào. Bấm “Ghi phím” rồi nhấn phím thật, hoặc thêm bước chờ / bấm chuột.
+                    No steps yet. Click “Record keys”, then press a real key, or add a wait / mouse-click step.
                   </p>
                 ) : (
                   <div className="space-y-1.5">
@@ -183,7 +183,7 @@ export default function MacroPage(): React.JSX.Element {
                         <span className="flex-1 text-white">{actionLabel(s)}</span>
                         <button
                           onClick={() => setSteps((prev) => prev.filter((_, j) => j !== i))}
-                          aria-label={`Xóa bước ${i + 1}`}
+                          aria-label={`Delete step ${i + 1}`}
                           className="flex h-[36px] w-[36px] items-center justify-center rounded-lg text-red-300 hover:bg-red-400/10"
                         >
                           <Trash2 className="h-4 w-4" />
@@ -197,7 +197,7 @@ export default function MacroPage(): React.JSX.Element {
               <div className="flex flex-wrap gap-2">
                 <GlassButton variant="ghost" onClick={() => setRecording((r) => !r)}>
                   <MousePointerClick className="h-4 w-4" />
-                  {recording ? 'Dừng ghi phím…' : 'Ghi phím…'}
+                  {recording ? 'Stop recording…' : 'Record keys…'}
                 </GlassButton>
                 <div className="flex items-center gap-2">
                   <input
@@ -206,7 +206,7 @@ export default function MacroPage(): React.JSX.Element {
                     min={10}
                     max={5000}
                     step={10}
-                    aria-label="Số mili giây chờ"
+                    aria-label="Wait milliseconds"
                     onChange={(e) => setDelayMs(Number(e.target.value))}
                     className="w-[90px] rounded-lg border border-white/15 bg-black/30 px-3 py-2.5 text-right font-mono text-sm text-white"
                   />
@@ -216,28 +216,28 @@ export default function MacroPage(): React.JSX.Element {
                       setSteps((prev) => [...prev, { kind: 'delay', delayMs: Math.max(10, delayMs) }]);
                     }}
                   >
-                    + Chờ {delayMs} ms
+                    + Wait {delayMs} ms
                   </GlassButton>
                 </div>
                 <GlassButton
                   variant="ghost"
                   onClick={() => setSteps((prev) => [...prev, { kind: 'mouse', button: 0, action: 'mousedown', delayMs: 0 }, { kind: 'mouse', button: 0, action: 'mouseup', delayMs: 0 }])}
                 >
-                  + Bấm chuột trái
+                  + Left click
                 </GlassButton>
               </div>
               {recording && (
                 <p className="animate-pulse text-sm text-[#ffb37a]">
-                  Đang ghi… nhấn phím bất kỳ (nhấn + nhả sẽ thành 2 bước). Bấm “Dừng ghi phím…” để xong.
+                  Recording… press any key (press + release becomes 2 steps). Click “Stop recording…” when done.
                 </p>
               )}
 
               <div className="flex gap-2 border-t border-white/10 pt-4">
                 <GlassButton onClick={saveCurrent}>
-                  <Save className="h-4 w-4" /> Lưu macro
+                  <Save className="h-4 w-4" /> Save macro
                 </GlassButton>
                 <GlassButton variant="ghost" onClick={closeEditor}>
-                  Hủy
+                  Cancel
                 </GlassButton>
               </div>
             </div>
@@ -248,8 +248,8 @@ export default function MacroPage(): React.JSX.Element {
 
       <ConfirmModal
         open={confirmDelete !== null}
-        title="Xóa macro?"
-        confirmLabel="Xóa"
+        title="Delete macro?"
+        confirmLabel="Delete"
         danger
         onConfirm={() => {
           if (confirmDelete) {
@@ -260,7 +260,7 @@ export default function MacroPage(): React.JSX.Element {
         }}
         onCancel={() => setConfirmDelete(null)}
       >
-        Macro sẽ bị xóa khỏi máy.
+        The macro will be deleted from this PC.
       </ConfirmModal>
     </div>
   );

@@ -1,7 +1,7 @@
 /**
- * Gán phím — remap 6 phím qua setKeys (verbatim chunk 515).
- * Nút DPI (index 5) là cố định, không remap được — app gốc cũng vậy.
- * Bấm "Bấm phím…" rồi nhấn 1 phím (kèm Ctrl/Shift/Alt) để gán.
+ * Key Bindings — remap 6 buttons via setKeys (verbatim chunk 515).
+ * The DPI button (index 5) is fixed and cannot be remapped — same in the original app.
+ * Click "Press a key…" then press a key (with Ctrl/Shift/Alt) to assign it.
  */
 import { useEffect, useRef, useState } from 'react';
 import { Keyboard, MousePointerClick, RotateCcw, X, Zap } from 'lucide-react';
@@ -33,14 +33,14 @@ export default function KeysPage(): React.JSX.Element {
     }
   }, [keys]);
 
-  // Key capture: 1 lần keydown -> map sang HID usage + modifier bitmask.
+  // Key capture: 1 keydown -> map to HID usage + modifier bitmask.
   useEffect(() => {
     if (!capturing || editing === null) return;
     const handler = (e: KeyboardEvent): void => {
       e.preventDefault();
       e.stopPropagation();
       const hid = CODE_TO_HID[e.code];
-      if (hid === undefined) return; // phím không map được thì bỏ qua, vẫn đang nghe
+      if (hid === undefined) return; // unmappable key: skip it, still listening
       let mods = 0;
       if (e.ctrlKey) mods |= 1;
       if (e.shiftKey) mods |= 2;
@@ -61,8 +61,8 @@ export default function KeysPage(): React.JSX.Element {
   if (!keys) {
     return (
       <div>
-        <PageHead title="Gán phím" subtitle="Remap 6 phím của chuột." />
-        <EmptyState text="Chưa kết nối — chọn Demo (mô phỏng) hoặc Kết nối chuột thật ở thanh trên cùng." />
+        <PageHead title="Key Bindings" subtitle="Remap the mouse's 6 buttons." />
+        <EmptyState text="Not connected — pick Demo (simulated) or Connect a real mouse in the top bar." />
       </div>
     );
   }
@@ -84,10 +84,10 @@ export default function KeysPage(): React.JSX.Element {
 
   return (
     <div>
-      <PageHead title="Gán phím" />
-      {/* v2.6: 2 cột thay vì 3 — card 3 cột hẹp (~152px) làm "Phím Trái"
-          và nút "Đổi gán phím" xuống dòng 2 lần, lệch cả lưới. 2 cột
-          (~240px) thì tiêu đề + nút đều vừa 1 dòng. */}
+      <PageHead title="Key Bindings" />
+      {/* v2.6: 2 columns instead of 3 — narrow 3-column cards (~152px) made "Left Button"
+          and the "Change binding" button wrap to 2 lines, skewing the whole grid. 2 columns
+          (~240px) fit the title + button on 1 line. */}
       <div className="grid gap-3 md:grid-cols-2">
         {draft.map((k, i) => {
           const isDpi = i === 5;
@@ -99,18 +99,18 @@ export default function KeysPage(): React.JSX.Element {
                   {k.type === 16 ? <Keyboard className="h-5 w-5" /> : k.type === 112 ? <Zap className="h-5 w-5" /> : <MousePointerClick className="h-5 w-5" />}
                 </div>
                 <div className="min-w-0 flex-1">
-                  <div className="text-sm font-semibold whitespace-nowrap text-white">Phím {KEY_LABELS[i]}</div>
+                  <div className="text-sm font-semibold whitespace-nowrap text-white">{KEY_LABELS[i]}</div>
                   <div className="truncate text-xs text-[#a2a2b0]" title={name}>
                     {name}
                   </div>
-                  {/* v2.6: dòng mono "type N · a,b,c" ĐÃ XÓA theo lệnh bro
-                      (text thừa, chỉ dev mới đọc). */}
+                  {/* v2.6: the mono "type N · a,b,c" line was REMOVED per Ethan's order
+                      (extra text, only a dev would read it). */}
                 </div>
               </div>
               <div className="mt-4">
                 {isDpi ? (
                   <span className="inline-block rounded-full border border-white/15 bg-white/5 px-3 py-1.5 text-[11px] text-[#a2a2b0]">
-                    Cố định — luôn là nút DPI
+                    Fixed — always the DPI button
                   </span>
                 ) : (
                   <button
@@ -118,7 +118,7 @@ export default function KeysPage(): React.JSX.Element {
                     onClick={() => setEditing(i)}
                     className="uiv-shy-btn w-full justify-center whitespace-nowrap"
                   >
-                    Đổi gán phím
+                    Change binding
                     <ShyArrow />
                   </button>
                 )}
@@ -130,20 +130,20 @@ export default function KeysPage(): React.JSX.Element {
 
       <div className="mt-4 flex flex-wrap gap-2">
         <button type="button" onClick={save} disabled={!dirty || busy} className="uiv-shy-btn uiv-shy-selected whitespace-nowrap disabled:opacity-50">
-          {mode === 'demo' ? 'Lưu (mô phỏng)' : 'Lưu xuống chuột'}
+          {mode === 'demo' ? 'Save (simulated)' : 'Save to mouse'}
           <ShyArrow />
         </button>
         <button type="button" onClick={() => setConfirmReset(true)} disabled={!dirty || busy} className="uiv-shy-btn whitespace-nowrap disabled:opacity-50">
-          <RotateCcw className="h-4 w-4" /> Về mặc định gốc
+          <RotateCcw className="h-4 w-4" /> Back to factory defaults
           <ShyArrow />
         </button>
       </div>
-      {!dirty && <p className="mt-3 text-xs text-[#a2a2b0]">Chưa có thay đổi nào. Bấm “Đổi gán phím” ở 1 phím để sửa.</p>}
+      {!dirty && <p className="mt-3 text-xs text-[#a2a2b0]">No changes yet. Click “Change binding” on a button to edit it.</p>}
 
       {/* Editor modal */}
       <ConfirmModal
         open={editing !== null}
-        title={editing !== null ? `Đổi phím ${KEY_LABELS[editing]}` : ''}
+        title={editing !== null ? `Change ${KEY_LABELS[editing]}` : ''}
         confirmLabel="Xong"
         onConfirm={() => setEditing(null)}
         onCancel={() => setEditing(null)}
@@ -151,11 +151,11 @@ export default function KeysPage(): React.JSX.Element {
         {editKey && editing !== null && (
           <div className="space-y-4">
             <div>
-              <FieldLabel>Hiện tại</FieldLabel>
+              <FieldLabel>Current</FieldLabel>
               <div className="rounded-xl border border-white/10 bg-black/30 px-3 py-2.5 font-mono text-sm text-white">{editKey.name}</div>
             </div>
             <div>
-              <FieldLabel>Chuột</FieldLabel>
+              <FieldLabel>Mouse</FieldLabel>
               <div className="flex flex-wrap gap-2">
                 {MOUSE_OPTIONS.map((o) => (
                   <button
@@ -170,7 +170,7 @@ export default function KeysPage(): React.JSX.Element {
               </div>
             </div>
             <div>
-              <FieldLabel>Bàn phím — bấm nút rồi nhấn phím thật</FieldLabel>
+              <FieldLabel>Keyboard — click the button, then press a real key</FieldLabel>
               <button
                 ref={captureRef}
                 onClick={() => setCapturing(true)}
@@ -180,13 +180,13 @@ export default function KeysPage(): React.JSX.Element {
                     : 'border-white/15 bg-white/5 text-white hover:border-[#ff5a1f]/50'
                 }`}
               >
-                {capturing ? 'Đang nghe… nhấn 1 phím (kèm Ctrl/Shift/Alt nếu muốn)' : 'Bấm phím…'}
+                {capturing ? 'Listening… press a key (with Ctrl/Shift/Alt if you want)' : 'Press a key…'}
               </button>
             </div>
             <div>
               <FieldLabel>Macro</FieldLabel>
               {macros.length === 0 ? (
-                <p className="text-xs text-[#a2a2b0]">Chưa có macro nào — sang tab Macro tạo trước rồi quay lại gán.</p>
+                <p className="text-xs text-[#a2a2b0]">No macros yet — create one in the Macro tab first, then come back to assign it.</p>
               ) : (
                 <div className="flex flex-wrap gap-2">
                   {macros.map((m, mi) => (
@@ -203,20 +203,20 @@ export default function KeysPage(): React.JSX.Element {
               )}
             </div>
             <div>
-              <FieldLabel>Khác</FieldLabel>
+              <FieldLabel>Other</FieldLabel>
               <div className="flex flex-wrap gap-2">
                 <button
                   onClick={() => applyToDraft(editing, { type: 33, code1: 85, code2: 0, code3: 0 })}
                   className="uiv-shy-btn whitespace-nowrap"
                 >
-                  Nút DPI
+                  DPI Button
                   <ShyArrow />
                 </button>
                 <button
                   onClick={() => applyToDraft(editing, { type: 0, code1: 0, code2: 0, code3: 0 })}
                   className="uiv-shy-btn whitespace-nowrap"
                 >
-                  <X className="h-3.5 w-3.5" /> Để trống
+                  <X className="h-3.5 w-3.5" /> Empty
                   <ShyArrow />
                 </button>
               </div>
@@ -227,8 +227,8 @@ export default function KeysPage(): React.JSX.Element {
 
       <ConfirmModal
         open={confirmReset}
-        title="Về mặc định gốc?"
-        confirmLabel="Khôi phục"
+        title="Back to factory defaults?"
+        confirmLabel="Restore"
         danger
         onConfirm={() => {
           setDraft(DEFAULT_KEYS.map((k) => ({ ...k })));
@@ -237,8 +237,8 @@ export default function KeysPage(): React.JSX.Element {
         }}
         onCancel={() => setConfirmReset(false)}
       >
-        Đặt lại 6 phím về mặc định gốc (Trái / Phải / Giữa / Lùi / Tiến / DPI).{' '}
-        {mode === 'demo' ? 'Bấm “Lưu (mô phỏng)” sau đó.' : 'Bấm “Lưu xuống chuột” sau đó để ghi thật.'}
+        Reset all 6 buttons to factory defaults (Left / Right / Middle / Back / Forward / DPI).{' '}
+        {mode === 'demo' ? 'Then click “Save (simulated)”.' : 'Then click “Save to mouse” to write for real.'}
       </ConfirmModal>
     </div>
   );

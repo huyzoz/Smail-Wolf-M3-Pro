@@ -1,18 +1,19 @@
 /**
- * DPI v2.5 — y như ảnh bro gửi (6 nấc màu + slider Slow↔Fast), nút đổi
- * sang shy-moth-10 (pill cam + mũi tên chevron), thêm preset theo tác vụ:
- * - 6 nấc: radio trên + pill giá trị (800 đỏ, 1600 xanh lá, 2400 xanh
- *   dương, 3200 tím, 6400 vàng, 12000 xanh ngọc — màu giữ trên nấc chưa
- *   chọn; nấc đang dùng = pill cam + chữ trắng). Nấc đang dùng có chữ
+ * DPI v2.5 — exactly like the image Ethan sent (6 colored stages + Slow↔Fast slider), buttons switched
+ * to shy-moth-10 (orange pill + chevron arrow), plus task presets:
+ * - 6 stages: radio on top + value pill (800 red, 1600 green, 2400
+ *   blue, 3200 purple, 6400 yellow, 12000 teal — colors stay on unselected
+ *   stages; the stage in use = orange pill + white text). The stage in use shows the text
  *   "Current DPI" xanh.
- * - Slider 200–12000: kéo thì màu fill đổi dần (xanh → đỏ theo DPI) và
- *   nấc "Current DPI" nhảy sang nấc gần nhất. Thả ra mới ghi (không spam
- *   50 lần ghi khi kéo); bấm nấc thì ăn ngay. KHÔNG còn nút Lưu / Hoàn
- *   tác — theo yêu cầu của bro ("bấm nút nào ăn ngay nút đấy").
- * - Preset theo tác vụ (v2.5): Văn phòng 1600 / Chơi game 3200 / Thiết
- *   kế 800 — bấm là ăn ngay (applyStage). Không còn subtitle (bro bảo xóa).
- * - "Restore default settings" góc phải trên → DEFAULT_DPI + nấc 2.
- * - Ít chữ, vừa khung không lướt.
+ * - Slider 200–12000: dragging gradually changes the fill color (blue → red by DPI) and
+ *   the marker follows the nearest stage. It only writes on release (no spamming
+ *   50 writes while dragging); clicking a stage applies instantly AND the slider
+ *   GLIDES to it (redesign 2026-11-19 — never jumps). NO more Save / Undo
+ *   buttons — per Ethan's request ("whatever button you press applies right away").
+ * - Task presets (v2.5): Office 1600 / Gaming 3200 / Design
+ *   800 — click to apply instantly (applyStage). No more subtitle (Ethan said to remove it).
+ * - "Restore default settings" at the top right → DEFAULT_DPI + stage 2.
+ * - Little text, fits the frame without scrolling.
  */
 import { useEffect, useRef, useState } from 'react';
 import { RotateCcw } from 'lucide-react';
@@ -23,19 +24,19 @@ import { EmptyState, PageHead, ShyArrow } from '../components/ui';
 const STAGE_COLORS = ['#f87171', '#4ade80', '#60a5fa', '#c084fc', '#facc15', '#22d3ee'];
 const TICKS = [200, 1000, 2000, 3000, 4000, 5000, 6000, 7000, 8000, 9000, 10000, 11000, 12000];
 
-/** Preset theo tác vụ (v2.5, lấp khoảng trống dưới slider — bro bảo phần
-    thừa bên dưới phải là preset văn phòng/chơi game, thật chuẩn từng tác
-    vụ): mỗi preset = 1 nấc có sẵn, bấm là ăn ngay (applyStage). Giá trị
-    chọn theo chuẩn thường dùng: văn phòng 1600 (nấc mặc định của chuột),
-    chơi game 3200 (mức game phổ biến), thiết kế 800 (thấp nhất, điều
-    khiển từng pixel). */
+/** Task presets (v2.5, filling the gap below the slider — Ethan said the space
+    below had to be office/gaming presets, truly fitting each task
+    ): each preset = one existing stage, click to apply instantly (applyStage). Values
+    chosen by common standards: office 1600 (the mouse's default stage),
+    gaming 3200 (a popular gaming level), design 800 (the lowest, for
+    pixel-by-pixel control). */
 const TASK_PRESETS: { label: string; dpi: number; stage: number }[] = [
-  { label: 'Văn phòng', dpi: 1600, stage: 1 },
-  { label: 'Chơi game', dpi: 3200, stage: 3 },
-  { label: 'Thiết kế', dpi: 800, stage: 0 },
+  { label: 'Office', dpi: 1600, stage: 1 },
+  { label: 'Gaming', dpi: 3200, stage: 3 },
+  { label: 'Design', dpi: 800, stage: 0 },
 ];
 
-/** Màu fill của slider đổi dần theo DPI: xanh dương (thấp) → đỏ (cao). */
+/** The slider fill color gradually changes with DPI: blue (low) → red (high). */
 function dpiHue(v: number): string {
   const t = Math.min(1, Math.max(0, (v - 200) / (12000 - 200)));
   return `hsl(${Math.round(220 - t * 220)} 90% 60%)`;
@@ -58,24 +59,67 @@ export default function DpiPage(): React.JSX.Element {
   const { config, busy, saveConfig } = useMouse();
   const [draft, setDraft] = useState<number[]>(DEFAULT_DPI);
   const [draftIndex, setDraftIndex] = useState(1);
-  // Giá trị slider đang kéo (live) — khác draft[draftIndex] trong lúc kéo.
+  // The slider value being dragged (live) — differs from draft[draftIndex] while dragging.
   const [sliderVal, setSliderVal] = useState(1600);
   const sliderValRef = useRef(1600);
   const [dragging, setDragging] = useState(false);
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Redesign 2026-11-19 (g): the slider GLIDES to a new stage instead of jumping.
+  const glideRef = useRef<number | null>(null);
+  const glideTargetRef = useRef<number | null>(null);
+  const reduceMotionRef = useRef(false);
+
+  useEffect(() => {
+    reduceMotionRef.current = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  }, []);
+
+  /** Glide the slider (UI only) from its current value to the target — the mouse
+      already got the new DPI instantly via saveConfig; only the slider travels.
+      easeInOutCubic, 150–500ms by distance; instant under reduced motion. */
+  const glideSliderTo = (target: number): void => {
+    if (glideRef.current !== null) cancelAnimationFrame(glideRef.current);
+    const start = sliderValRef.current;
+    glideTargetRef.current = target;
+    if (start === target || reduceMotionRef.current) {
+      setSliderVal(target);
+      sliderValRef.current = target;
+      glideRef.current = null;
+      return;
+    }
+    const dur = Math.min(500, 150 + (Math.abs(target - start) / 11800) * 350);
+    const t0 = performance.now();
+    const tick = (t: number): void => {
+      const p = Math.min(1, (t - t0) / dur);
+      const e = p < 0.5 ? 4 * p * p * p : 1 - Math.pow(-2 * p + 2, 3) / 2;
+      const v = Math.round(start + (target - start) * e);
+      setSliderVal(v);
+      sliderValRef.current = v;
+      glideRef.current = p < 1 ? requestAnimationFrame(tick) : null;
+    };
+    glideRef.current = requestAnimationFrame(tick);
+  };
 
   useEffect(() => {
     if (config) {
       setDraft([...config.dpi]);
       setDraftIndex(config.dpiIndex);
-      setSliderVal(config.dpi[config.dpiIndex]);
-      sliderValRef.current = config.dpi[config.dpiIndex];
+      const incoming = config.dpi[config.dpiIndex];
+      if (glideRef.current !== null) {
+        // Glide in flight: it already heads for the applied value — don't snap
+        // it. If the mouse reports something else, the mouse wins: cancel + snap.
+        if (glideTargetRef.current === incoming) return;
+        cancelAnimationFrame(glideRef.current);
+        glideRef.current = null;
+      }
+      setSliderVal(incoming);
+      sliderValRef.current = incoming;
     }
   }, [config]);
 
   useEffect(
     () => () => {
       if (saveTimer.current) clearTimeout(saveTimer.current);
+      if (glideRef.current !== null) cancelAnimationFrame(glideRef.current);
     },
     [],
   );
@@ -84,15 +128,15 @@ export default function DpiPage(): React.JSX.Element {
     return (
       <div>
         <PageHead title="DPI" />
-        <EmptyState text="Chưa kết nối — chọn Demo (mô phỏng) hoặc Kết nối chuột thật ở thanh trên cùng." />
+        <EmptyState text="Not connected — pick Demo (simulated) or Connect a real mouse in the top bar." />
       </div>
     );
   }
 
-  // Nấc "Current DPI" hiển thị: lúc kéo thì nhảy theo nấc gần nhất,
-  // lúc không kéo thì là nấc đang dùng thật.
+  // The displayed active stage: while dragging it follows the nearest stage,
+  // when not dragging it is the stage actually in use.
   const shownIndex = dragging ? nearestStage(draft, sliderVal) : draftIndex;
-  // Giá trị hiển thị trên từng thẻ: nấc đang kéo thì hiện sliderVal live.
+  // Value shown on each card: the stage being dragged shows the live sliderVal.
   const shownDpi = (i: number): number => (dragging && i === shownIndex ? sliderVal : draft[i]);
 
   const applyStage = (i: number): void => {
@@ -100,12 +144,11 @@ export default function DpiPage(): React.JSX.Element {
     const prevIndex = draftIndex;
     const prevVal = draft[draftIndex];
     setDraftIndex(i);
-    setSliderVal(draft[i]);
-    sliderValRef.current = draft[i];
+    glideSliderTo(draft[i]);
     void saveConfig({ ...config, dpi: draft, dpiIndex: i }).then((ok) => {
       if (!ok) {
         setDraftIndex(prevIndex);
-        setSliderVal(prevVal);
+        glideSliderTo(prevVal);
       }
     });
   };
@@ -122,18 +165,22 @@ export default function DpiPage(): React.JSX.Element {
       if (!ok) {
         setDraft([...config.dpi]);
         setDraftIndex(config.dpiIndex);
-        setSliderVal(config.dpi[config.dpiIndex]);
-        sliderValRef.current = config.dpi[config.dpiIndex];
+        glideSliderTo(config.dpi[config.dpiIndex]);
       }
     });
   };
 
   const onSliderChange = (v: number): void => {
+    // The user grabbed the slider — a glide in flight hands over to the drag.
+    if (glideRef.current !== null) {
+      cancelAnimationFrame(glideRef.current);
+      glideRef.current = null;
+    }
     const clamped = clampDpi(v);
     setSliderVal(clamped);
     sliderValRef.current = clamped;
     setDragging(true);
-    // Ghi sau khi thả 250ms (debounce) — kéo 1 lần chỉ ghi 1 lần.
+    // Write 250ms after release (debounce) — one drag writes only once.
     if (saveTimer.current) clearTimeout(saveTimer.current);
     saveTimer.current = setTimeout(() => {
       setDragging(false);
@@ -145,8 +192,7 @@ export default function DpiPage(): React.JSX.Element {
     if (busy) return;
     setDraft([...DEFAULT_DPI]);
     setDraftIndex(1);
-    setSliderVal(1600);
-    sliderValRef.current = 1600;
+    glideSliderTo(1600);
     void saveConfig({ ...config, dpi: [...DEFAULT_DPI], dpiIndex: 1 });
   };
 
@@ -166,9 +212,9 @@ export default function DpiPage(): React.JSX.Element {
         </button>
       </div>
 
-      {/* 6 nấc: radio trên + pill shy-moth-10 (v2.5, thay thẻ vuông v2.4).
-          Nấc chưa chọn giữ màu riêng của nó (800 đỏ, 1600 xanh lá…);
-          nấc đang chọn = pill cam + chữ trắng + mũi tên. */}
+      {/* 6 stages: radio on top + shy-moth-10 pill (v2.5, replacing the v2.4 square cards).
+          Unselected stages keep their own color (800 red, 1600 green…);
+          the selected stage = orange pill + white text + arrow. */}
       <div className="grid grid-cols-3 gap-1.5 sm:grid-cols-6">
         {draft.map((d, i) => {
           const active = i === shownIndex;
@@ -178,7 +224,7 @@ export default function DpiPage(): React.JSX.Element {
               <button
                 onClick={() => applyStage(i)}
                 disabled={busy}
-                aria-label={`Chọn nấc ${i + 1} (${d} DPI)`}
+                aria-label={`Choose stage ${i + 1} (${d} DPI)`}
                 aria-pressed={active}
                 className={`flex h-[18px] w-[18px] shrink-0 items-center justify-center rounded-full border-2 transition active:scale-90 ${
                   active ? 'border-[#ff5a1f] bg-[#ff5a1f]' : 'border-[#ff5a1f]/60 bg-transparent hover:border-[#ff5a1f]'
@@ -186,20 +232,19 @@ export default function DpiPage(): React.JSX.Element {
               >
                 {active && <span className="h-[8px] w-[8px] rounded-full bg-white" aria-hidden="true" />}
               </button>
-              {/* Nhãn "Current DPI" (xanh, như ảnh bro gửi) — hàng riêng để
-                  các thẻ luôn thẳng hàng, không bị nhãn dài đẩy lệch. */}
-              <span className="mt-1 flex h-4 items-center text-[10px] font-bold whitespace-nowrap text-[#60a5fa]">
-                {active ? 'Current DPI' : ''}
-              </span>
+              {/* (Redesign 2026-11-19: no "Current DPI" text — the orange pill +
+                  filled radio already mark the active stage. The empty row keeps
+                  the pills aligned.) */}
+              <span className="mt-1 flex h-4 items-center" aria-hidden="true" />
               <button
                 onClick={() => applyStage(i)}
                 disabled={busy}
-                aria-label={`Nấc ${i + 1}: ${val.toLocaleString('vi-VN')} DPI`}
+                aria-label={`Stage ${i + 1}: ${val.toLocaleString('en-GB')} DPI`}
                 aria-pressed={active}
                 className={`uiv-shy-btn uiv-shy-compact mt-1.5 w-full ${active ? 'uiv-shy-selected' : ''}`}
                 style={active ? undefined : { color: STAGE_COLORS[i] }}
               >
-                {val.toLocaleString('vi-VN')}
+                {val.toLocaleString('en-GB')}
                 <ShyArrow small />
               </button>
             </div>
@@ -207,8 +252,8 @@ export default function DpiPage(): React.JSX.Element {
         })}
       </div>
 
-      {/* Slider Slow↔Fast (y như ảnh bro gửi): fill đổi màu dần theo DPI,
-          nấc Current DPI nhảy theo khi kéo. */}
+      {/* Slow↔Fast slider (exactly like the image Ethan sent): fill gradually changes color with DPI,
+          the Current DPI stage jumps along while dragging. */}
       <div className="mt-6">
         <div className="flex items-center gap-3">
           <span className="w-10 shrink-0 text-right text-[13px] font-medium text-[#c9c9d6]">Slow</span>
@@ -220,7 +265,7 @@ export default function DpiPage(): React.JSX.Element {
             max={12000}
             step={50}
             disabled={busy}
-            aria-label="DPI (kéo để đổi, thả ra là ghi)"
+            aria-label="DPI (drag to change, release to save)"
             style={{
               background: `linear-gradient(90deg, ${fillColor} ${pct}%, rgba(255,255,255,0.14) ${pct}%)`,
             }}
@@ -239,14 +284,14 @@ export default function DpiPage(): React.JSX.Element {
           ))}
         </div>
         <p className="mt-2 text-center text-[13px] text-[#a2a2b0]">
-          Đang đặt: <b style={{ color: fillColor }}>{sliderVal.toLocaleString('vi-VN')} DPI</b>
-          {dragging ? ' — thả ra để ghi' : ` — nấc ${shownIndex + 1}`}
+          Setting: <b style={{ color: fillColor }}>{sliderVal.toLocaleString('en-GB')} DPI</b>
+          {dragging ? ' — release to save' : ''}
         </p>
       </div>
 
-      {/* Preset theo tác vụ (v2.5): bấm là ăn ngay, không lướt. */}
+      {/* Task presets (v2.5): click to apply instantly, no scrolling. */}
       <div className="mt-6 border-t border-white/10 pt-4">
-        <div className="mb-2 text-[13px] font-semibold text-[#edebe6]">Preset theo tác vụ</div>
+        <div className="mb-2 text-[13px] font-semibold text-[#edebe6]">Task presets</div>
         <div className="flex flex-wrap gap-2">
           {TASK_PRESETS.map((p) => {
             const active = draftIndex === p.stage && draft[p.stage] === p.dpi;
@@ -255,11 +300,11 @@ export default function DpiPage(): React.JSX.Element {
                 key={p.label}
                 onClick={() => applyStage(p.stage)}
                 disabled={busy}
-                aria-label={`Preset ${p.label}: ${p.dpi.toLocaleString('vi-VN')} DPI`}
+                aria-label={`Preset ${p.label}: ${p.dpi.toLocaleString('en-GB')} DPI`}
                 aria-pressed={active}
                 className={`uiv-shy-btn ${active ? 'uiv-shy-selected' : ''}`}
               >
-                {p.label} · {p.dpi.toLocaleString('vi-VN')}
+                {p.label} · {p.dpi.toLocaleString('en-GB')}
                 <ShyArrow />
               </button>
             );

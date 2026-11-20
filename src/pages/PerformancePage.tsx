@@ -1,10 +1,10 @@
 /**
- * Hiệu năng v2.4 — gọn, ít chữ, vừa khung không lướt (theo yêu cầu bro):
- * 4 hàng compact, không còn đoạn giải thích dài, không còn dòng "Byte 51
- * = ..." — bấm/toggle/kéo là ăn ngay (ghi qua setConfig đã chứng minh
- * live), KHÔNG còn nút Lưu / Hoàn tác. Ghi hỏng (đang bận) thì trả lại
- * giá trị cũ. Ngủ đông: kéo slider thì ghi sau khi thả 250ms (debounce).
- * Wake-up chỉ còn 1 dòng (hành vi cố định của chuột, không phải setting).
+ * Performance v2.4 — compact, little text, fits the frame without scrolling (per Ethan's request):
+ * 4 compact rows, no more long explanations, no more "Byte 51
+ * = ..." line — click/toggle/drag applies instantly (writes via setConfig, already proven
+ * live), NO more Save / Undo buttons. A failed write (busy) restores
+ * the old value. Sleep: dragging the slider writes 250ms after release (debounce).
+ * Wake-up is just 1 line now (fixed mouse behavior, not a setting).
  */
 import { useEffect, useRef, useState } from 'react';
 import { Moon, MoveHorizontal, Zap } from 'lucide-react';
@@ -17,11 +17,11 @@ export default function PerformancePage(): React.JSX.Element {
   const [rateIdx, setRateIdx] = useState(0);
   const [sleep, setSleep] = useState(5);
   const [neverSleep, setNeverSleep] = useState(false);
-  // v2.7: số phút KHÔI PHỤC khi tắt Never sleep. BUG v2.6: effect đồng bộ
-  // dưới đây setSleep(config.sleepLight) — khi bật Never sleep, config
-  // về 0 nên sleep bị ghi đè thành 0, mất số phút cũ; tắt Never sleep
-  // thì ghi lại sleepLight = sleep = 0 → toggle nhảy bật lại, không tắt
-  // được (đúng lỗi bro báo). lastSleep CHỈ cập nhật khi giá trị ≠ 0.
+  // v2.7: the minutes to RESTORE when Never sleep is turned off. BUG v2.6: the sync effect
+  // below calls setSleep(config.sleepLight) — when Never sleep is on, the config
+  // goes to 0, so sleep is overwritten with 0 and the old minutes are lost; turning Never sleep
+  // off then writes sleepLight = sleep = 0 → the toggle jumps back on and can't be
+  // turned off (exactly the bug Ethan reported). lastSleep ONLY updates when the value ≠ 0.
   const [lastSleep, setLastSleep] = useState(5);
   const [scroll, setScroll] = useState(0);
   const [lineCorrection, setLineCorrection] = useState(false);
@@ -32,7 +32,7 @@ export default function PerformancePage(): React.JSX.Element {
       setRateIdx(config.reportRateIndex);
       setSleep(config.sleepLight);
       setNeverSleep(config.sleepLight === 0);
-      // v2.7: chỉ nhớ số phút khi nó ≠ 0 — không thì mất số khôi phục.
+      // v2.7: only remember the minutes when they are ≠ 0 — otherwise the restore value is lost.
       if (config.sleepLight !== 0) setLastSleep(config.sleepLight);
       setScroll(config.scrollFlag);
       setLineCorrection((config.sensorFlag & 1) === 1);
@@ -49,15 +49,15 @@ export default function PerformancePage(): React.JSX.Element {
   if (!config) {
     return (
       <div>
-        <PageHead title="Hiệu năng" subtitle="Bấm là ăn ngay — không nút Lưu." compact />
-        <EmptyState text="Chưa kết nối — chọn Demo (mô phỏng) hoặc Kết nối chuột thật ở thanh trên cùng." />
+        <PageHead title="Performance" subtitle="Click to apply instantly — no Save button." compact />
+        <EmptyState text="Not connected — pick Demo (simulated) or Connect a real mouse in the top bar." />
       </div>
     );
   }
 
   const list = wired ? POLLING_WIRED : POLLING_24G;
 
-  /** Ghi 1 field ngay; hỏng thì trả lại giá trị cũ (tránh lệch UI ↔ chuột). */
+  /** Write one field immediately; on failure restore the old value (avoids UI ↔ mouse mismatch). */
   const apply = (patch: Partial<MouseConfig>, revert: () => void): void => {
     if (busy) {
       revert();
@@ -105,33 +105,33 @@ export default function PerformancePage(): React.JSX.Element {
     const prev = neverSleep;
     setNeverSleep(v);
     if (sleepTimer.current) clearTimeout(sleepTimer.current);
-    // v2.7: tắt thì ghi lại lastSleep (số phút trước khi bật), KHÔNG
-    // dùng sleep (đã bị 0 khi bật Never sleep).
+    // v2.7: turning off writes back lastSleep (the minutes before turning on), NOT
+    // sleep (which became 0 when Never sleep was turned on).
     apply({ sleepLight: v ? 0 : lastSleep }, () => setNeverSleep(prev));
   };
 
   return (
     <div>
-      <PageHead title="Hiệu năng" subtitle="Bấm là ăn ngay — không nút Lưu." compact />
+      <PageHead title="Performance" subtitle="Click to apply instantly — no Save button." compact />
       <div className="space-y-2">
         <GlassCard compact>
           <div className="mb-2 flex items-center gap-2 text-[15px] font-semibold text-[#edebe6]">
             <Zap className="h-4 w-4 text-[#ff8a3d]" /> Polling rate
-            <span className="ml-auto font-mono text-xs text-[#a2a2b0]">{wired ? 'Dây' : '2.4G'}</span>
+            <span className="ml-auto font-mono text-xs text-[#a2a2b0]">{wired ? 'Wired' : '2.4G'}</span>
           </div>
           <SegmentedControl
             name="polling-rate"
             value={rateIdx}
             onChange={setRate}
             columns={4}
-            options={list.map((hz, i) => ({ value: i, label: `${hz} Hz`, tag: `P${i + 1}` }))}
+            options={list.map((hz, i) => ({ value: i, label: `${hz} Hz` }))}
           />
         </GlassCard>
 
         <GlassCard compact>
           <div className="mb-2 flex items-center gap-2 text-[15px] font-semibold text-[#edebe6]">
-            <Moon className="h-4 w-4 text-[#ff8a3d]" /> Ngủ đông
-            <span className="ml-auto text-sm font-bold text-white">{neverSleep ? 'Không ngủ' : `${sleep} phút`}</span>
+            <Moon className="h-4 w-4 text-[#ff8a3d]" /> Sleep
+            <span className="ml-auto text-sm font-bold text-white">{neverSleep ? 'Never sleep' : `${sleep} min`}</span>
             <Toggle checked={neverSleep} label="Never sleep" onChange={onNeverSleep} compact />
           </div>
           <Slider
@@ -139,7 +139,7 @@ export default function PerformancePage(): React.JSX.Element {
             min={0}
             max={100}
             step={1}
-            ariaLabel="Số phút trước khi ngủ đông"
+            ariaLabel="Minutes before sleep"
             disabled={neverSleep}
             onChange={onSleepChange}
           />
@@ -147,15 +147,15 @@ export default function PerformancePage(): React.JSX.Element {
 
         <GlassCard compact>
           <div className="mb-2 flex items-center gap-2 text-[15px] font-semibold text-[#edebe6]">
-            <MoveHorizontal className="h-4 w-4 text-[#ff8a3d]" /> Hướng lăn
+            <MoveHorizontal className="h-4 w-4 text-[#ff8a3d]" /> Scroll direction
           </div>
           <SegmentedControl
             name="roller-direction"
             value={scroll}
             onChange={setScrollDir}
             options={[
-              { value: 0, label: 'Bình thường', tag: '正向' },
-              { value: 1, label: 'Đảo ngược', tag: '反向' },
+              { value: 0, label: 'Normal', tag: '正向' },
+              { value: 1, label: 'Reversed', tag: '反向' },
             ]}
           />
         </GlassCard>
@@ -167,7 +167,7 @@ export default function PerformancePage(): React.JSX.Element {
             label="Line correction"
             onChange={setLine}
           />
-          <p className="mt-1 text-xs text-[#a2a2b0]">Đánh thức: bấm hoặc di chuột (cố định, không đổi được).</p>
+          <p className="mt-1 text-xs text-[#a2a2b0]">Wake-up: click or move the mouse (fixed, cannot be changed).</p>
         </GlassCard>
       </div>
     </div>
