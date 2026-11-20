@@ -1988,54 +1988,70 @@ html[data-theme="dark"] .uiv-btn-ghost:hover:not(:disabled) {
 }
 
 /* ---------- V3.0.11: connection-cluster Color Bar Sweep (TopBar) ----------
-   Cycle (JS-driven phases, data-sweep on the pill): sweep-in 0.9s L→R
-   (decelerate, power2.out) → text 2.2s → sweep-out 0.6s R→L (accelerate,
-   power2.in, ~65% of enter). Band = 3 overlapping strips, ui-ux-pro-max
-   gaming palette: violet #7C3AED → rose #F43F5E → brand orange #EA580C.
-   Band is 150% of the pill so mid-sweep it covers all 3 icons at once.
-   Text labels fade in blur 6px → sharp, staggered 40ms; the active mode
-   is orange + bold + glow. Transform/opacity only — never blocks input.
-   Reduced motion: the cycle never starts (JS), and the animations are
-   killed here too as a backstop. */
+   Fixed in v3.0.12 on Ethan's live verdict ("xấu", pill widened, 3 labels):
+   cycle every 10s (JS: CYCLE_MS), first run ~6s after connect.
+   The band is 3 strips CHASING each other — each 75% of the pill, staggered
+   0/150/300ms, constant speed (linear), violet #7C3AED → rose #F43F5E →
+   brand orange #EA580C (ui-ux-pro-max gaming palette). Mid-sweep the three
+   strips jointly cover the whole pill (freeze-check in probe-v311-sweep:
+   all strips paused at currentTime 600ms). Sweep-out reverses: the same
+   strips chase back R→L with the stagger flipped (300/150/0ms), 0.6s
+   travel, so the phase is 0.9s. The text phase shows ONE label — the
+   active mode only — fading in blur 6px → sharp, orange + bold + glow.
+   The pill NEVER moves: the icons row stays in flow in every phase (only
+   .conn-icons-faded drops its opacity), the band + text are absolute
+   overlays. Transform/opacity only — never blocks input. Reduced motion:
+   the cycle never starts (JS), and the animations are killed here too. */
 .conn-sweep-band {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 2;
+}
+.conn-sweep-strip {
   position: absolute;
   top: 0;
   bottom: 0;
   left: 0;
-  width: 150%;
-  display: flex;
-  pointer-events: none;
-  z-index: 2;
-  animation: conn-sweep-in 0.9s cubic-bezier(0.25, 0.46, 0.45, 0.94) both;
+  width: 75%;
+  animation: conn-strip-in 0.9s linear both;
 }
-.conn-sweep-band-out {
-  animation: conn-sweep-out 0.6s cubic-bezier(0.55, 0.06, 0.68, 0.19) both;
+.conn-sweep-strip-1 {
+  background: linear-gradient(90deg, #7c3aed, #a78bfa);
+  animation-delay: 0s;
 }
-@keyframes conn-sweep-in {
-  from { transform: translateX(-101%); }
-  to { transform: translateX(101%); }
-}
-@keyframes conn-sweep-out {
-  from { transform: translateX(101%); }
-  to { transform: translateX(-101%); }
-}
-.conn-sweep-strip {
-  flex: 1;
-  height: 100%;
-}
-.conn-sweep-strip-1 { background: linear-gradient(90deg, #7c3aed, #a78bfa); }
 .conn-sweep-strip-2 {
   background: linear-gradient(90deg, #f43f5e, #fb7185);
-  margin-left: -14px;
+  animation-delay: 0.15s;
 }
 .conn-sweep-strip-3 {
   background: linear-gradient(90deg, #ea580c, #ff8a3d);
-  margin-left: -14px;
+  animation-delay: 0.3s;
 }
+.conn-sweep-band-out .conn-sweep-strip {
+  animation-name: conn-strip-out;
+  animation-duration: 0.6s;
+}
+.conn-sweep-band-out .conn-sweep-strip-1 { animation-delay: 0.3s; }
+.conn-sweep-band-out .conn-sweep-strip-2 { animation-delay: 0.15s; }
+.conn-sweep-band-out .conn-sweep-strip-3 { animation-delay: 0s; }
+@keyframes conn-strip-in {
+  from { transform: translateX(-101%); }
+  to { transform: translateX(134%); }
+}
+@keyframes conn-strip-out {
+  from { transform: translateX(134%); }
+  to { transform: translateX(-101%); }
+}
+.conn-icons-faded { opacity: 0; }
 .conn-mode-text {
+  position: absolute;
+  inset: 0;
   display: flex;
   align-items: center;
-  gap: 8px;
+  justify-content: center;
+  pointer-events: none;
+  z-index: 3;
   white-space: nowrap;
 }
 .conn-mode-label {
@@ -2044,8 +2060,6 @@ html[data-theme="dark"] .uiv-btn-ghost:hover:not(:disabled) {
   color: rgba(85, 85, 92, 0.55);
   animation: conn-label-in 0.35s ease-out both;
 }
-.conn-mode-text .conn-mode-label:nth-child(2) { animation-delay: 40ms; }
-.conn-mode-text .conn-mode-label:nth-child(3) { animation-delay: 80ms; }
 @keyframes conn-label-in {
   from { opacity: 0; filter: blur(6px); }
   to { opacity: 1; filter: blur(0); }
@@ -2056,7 +2070,7 @@ html[data-theme="dark"] .uiv-btn-ghost:hover:not(:disabled) {
   text-shadow: 0 0 8px rgba(234, 88, 12, 0.45);
 }
 @media (prefers-reduced-motion: reduce) {
-  .conn-sweep-band, .conn-mode-label { animation: none; }
+  .conn-sweep-strip, .conn-mode-label { animation: none; }
 }
 
 /* ---------- V3.0.11: one colour per More section (data-tone) ----------
