@@ -42,12 +42,19 @@ export function TopBar(): React.JSX.Element {
     const SWEEP_OUT_MS = 600;
     const CYCLE_MS = 24000;
     let cancelled = false;
+    let running = false;
     const at = (fn: () => void, ms: number): void => {
       sweepTimers.current.push(
         setTimeout(() => {
           if (!cancelled) fn();
         }, ms),
       );
+    };
+    const stopCycle = (): void => {
+      running = false;
+      sweepTimers.current.forEach(clearTimeout);
+      sweepTimers.current = [];
+      setSweep('idle');
     };
     const cycle = (startIn: number): void => {
       at(() => setSweep('sweep-in'), startIn);
@@ -56,9 +63,26 @@ export function TopBar(): React.JSX.Element {
       at(() => setSweep('idle'), startIn + SWEEP_IN_MS + TEXT_MS + SWEEP_OUT_MS);
       at(() => cycle(CYCLE_MS), startIn + CYCLE_MS);
     };
-    cycle(SWEEP_FIRST_MS);
+    const startCycle = (): void => {
+      if (running || cancelled) return;
+      running = true;
+      cycle(SWEEP_FIRST_MS);
+    };
+    // W9: don't burn cycles while the window is hidden to tray — the band
+    // is invisible there and every phase change re-renders the top bar for
+    // nothing. Pause on hide (band back to icons), restart from the top on
+    // show. The 1s battery tick + 30s live poll deliberately keep running
+    // while hidden: the tray popup reads the live battery from them.
+    const onVisibility = (): void => {
+      if (cancelled) return;
+      if (document.hidden) stopCycle();
+      else startCycle();
+    };
+    document.addEventListener('visibilitychange', onVisibility);
+    if (!document.hidden) startCycle();
     return () => {
       cancelled = true;
+      document.removeEventListener('visibilitychange', onVisibility);
       sweepTimers.current.forEach(clearTimeout);
       sweepTimers.current = [];
     };
