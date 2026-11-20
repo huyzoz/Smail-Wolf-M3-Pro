@@ -169,19 +169,19 @@ export function LeftPanel(): React.JSX.Element {
           {tab === 'performance' && <PerformancePage />}
           {tab === 'others' && (
             <div>
-              <PageHead title="More" subtitle="Battery · Firmware · Profiles · Settings · Restore · Raw." />
+              <PageHead title="More" subtitle="Battery · Profiles · Settings · Restore · Raw · Firmware." />
               {/* Redesign 2026-11-19 (a): single-column stack, Battery FIRST, every
                   section collapsible in a Firmware-card blue-glass frame. Battery +
-                  Firmware open by default; open/closed persists per section. */}
+                  Firmware open by default; open/closed persists per section.
+                  v3.0.11: Firmware moved LAST (the update check still fires at
+                  app start — AppUpdateGate, not this section — so nothing is
+                  slower); each section has its own colour via data-tone. */}
               <div className="space-y-4">
                 <MoreSection id="battery" eyebrow="Battery" title="Battery" badge={<BatteryBadge />}>
                   <Dashboard bare />
                   <div className="mt-4">
                     <BatterySaverCard />
                   </div>
-                </MoreSection>
-                <MoreSection id="firmware" eyebrow="Firmware · duyzoz" title={<FirmwareTag />}>
-                  <FirmwareBody />
                 </MoreSection>
                 <MoreSection id="profiles" eyebrow="Profiles" title="Profiles">
                   <ProfileCard />
@@ -194,6 +194,9 @@ export function LeftPanel(): React.JSX.Element {
                 </MoreSection>
                 <MoreSection id="raw" eyebrow="Raw" title="Latest raw reply">
                   <RawReplyCard />
+                </MoreSection>
+                <MoreSection id="firmware" eyebrow="Firmware · duyzoz" title={<FirmwareTag />}>
+                  <FirmwareBody />
                 </MoreSection>
               </div>
             </div>

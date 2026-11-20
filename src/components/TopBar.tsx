@@ -12,7 +12,7 @@
  * Nav removed in v2.2, folded into the 4-item menu in the left panel (LeftPanel).
  * Below is a mono annotation strip in blueprint style (only on screens ≥1536px).
  */
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Bluetooth, Cable, Power, RefreshCw, Wifi } from 'lucide-react';
 import { useMouse } from '../store';
 import { ConfirmModal } from './ui';
@@ -23,6 +23,46 @@ import { FALLBACK_APP_VERSION, currentAppVersion } from '../lib/updater';
 export function TopBar(): React.JSX.Element {
   const { mode, connected, busy, wired, deviceLabel, disconnect, refresh, theme } = useMouse();
   const [confirmDisconnect, setConfirmDisconnect] = useState(false);
+  // v3.0.11 — Color Bar Sweep (Ethan): every ~24s the mode pill runs a
+  // cycle — a 3-bar colour band (violet → rose → orange, ui-ux-pro-max
+  // gaming palette) sweeps L→R over the icons, the 3 modes appear as text
+  // fading in blur → sharp (active highlighted), then the band sweeps back
+  // R→L and the icons return. Transform/opacity only, never blocks input
+  // (pill is display-only), first run ~6s after connect, static under
+  // reduced-motion. Phase is exposed as data-sweep for the probe.
+  type SweepPhase = 'idle' | 'sweep-in' | 'text' | 'sweep-out';
+  const [sweep, setSweep] = useState<SweepPhase>('idle');
+  const sweepTimers = useRef<ReturnType<typeof setTimeout>[]>([]);
+  useEffect(() => {
+    if (!connected) return;
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+    const SWEEP_FIRST_MS = 6000;
+    const SWEEP_IN_MS = 900;
+    const TEXT_MS = 2200;
+    const SWEEP_OUT_MS = 600;
+    const CYCLE_MS = 24000;
+    let cancelled = false;
+    const at = (fn: () => void, ms: number): void => {
+      sweepTimers.current.push(
+        setTimeout(() => {
+          if (!cancelled) fn();
+        }, ms),
+      );
+    };
+    const cycle = (startIn: number): void => {
+      at(() => setSweep('sweep-in'), startIn);
+      at(() => setSweep('text'), startIn + SWEEP_IN_MS);
+      at(() => setSweep('sweep-out'), startIn + SWEEP_IN_MS + TEXT_MS);
+      at(() => setSweep('idle'), startIn + SWEEP_IN_MS + TEXT_MS + SWEEP_OUT_MS);
+      at(() => cycle(CYCLE_MS), startIn + CYCLE_MS);
+    };
+    cycle(SWEEP_FIRST_MS);
+    return () => {
+      cancelled = true;
+      sweepTimers.current.forEach(clearTimeout);
+      sweepTimers.current = [];
+    };
+  }, [connected]);
   // Real app version (Tauri getVersion(), fallback = bump-script constant) —
   // the old hardcoded "v3.0.0" lied on every release after v3.0.0.
   const [appVersion, setAppVersion] = useState(FALLBACK_APP_VERSION);
@@ -62,23 +102,53 @@ export function TopBar(): React.JSX.Element {
               glows orange; hovering any icon bounces it up. (The app only reaches the
               mouse via cable/2.4G through the WebHID vendor filter — Bluetooth is
               ready for a future BT path.) Demo keeps a tiny DEMO tag so simulation
-              is never mistaken for a real mouse. */}
+              is never mistaken for a real mouse. v3.0.11: the pill runs a Color Bar
+              Sweep cycle (see the sweep effect above) — band covers the icons,
+              then the 3 modes show as text, then the band sweeps back. */}
           {connected && (
             <span
-              className="flex items-center gap-2.5 rounded-full border border-[rgba(22,22,26,0.16)] bg-white/50 px-3 py-2"
+              data-sweep={sweep}
+              className="relative flex items-center gap-2.5 overflow-hidden rounded-full border border-[rgba(22,22,26,0.16)] bg-white/50 px-3 py-2"
               title={wired ? 'Wired mode' : '2.4GHz mode'}
             >
-              <span title="2.4G" className={`conn-icon ${!wired ? 'conn-icon-active' : ''}`}>
-                <Wifi className="h-4 w-4" />
-              </span>
-              <span title="Wired" className={`conn-icon ${wired ? 'conn-icon-active' : ''}`}>
-                <Cable className="h-4 w-4" />
-              </span>
-              <span title="Bluetooth" className="conn-icon">
-                <Bluetooth className="h-4 w-4" />
-              </span>
-              {mode === 'demo' && (
-                <span className="text-[10px] font-bold tracking-wide text-amber-800">DEMO</span>
+              {sweep !== 'text' && (
+                <span className="flex items-center gap-2.5">
+                  <span title="2.4G" className={`conn-icon ${!wired ? 'conn-icon-active' : ''}`}>
+                    <Wifi className="h-4 w-4" />
+                  </span>
+                  <span title="Wired" className={`conn-icon ${wired ? 'conn-icon-active' : ''}`}>
+                    <Cable className="h-4 w-4" />
+                  </span>
+                  <span title="Bluetooth" className="conn-icon">
+                    <Bluetooth className="h-4 w-4" />
+                  </span>
+                  {mode === 'demo' && (
+                    <span className="text-[10px] font-bold tracking-wide text-amber-800">DEMO</span>
+                  )}
+                </span>
+              )}
+              {(sweep === 'sweep-in' || sweep === 'sweep-out') && (
+                <span className={`conn-sweep-band${sweep === 'sweep-out' ? ' conn-sweep-band-out' : ''}`} aria-hidden>
+                  <span className="conn-sweep-strip conn-sweep-strip-1" />
+                  <span className="conn-sweep-strip conn-sweep-strip-2" />
+                  <span className="conn-sweep-strip conn-sweep-strip-3" />
+                </span>
+              )}
+              {sweep === 'text' && (
+                <span className="conn-mode-text">
+                  {(['2.4GHz', 'Ethernet', 'Bluetooth'] as const).map((label) => {
+                    const active = (wired && label === 'Ethernet') || (!wired && label === '2.4GHz');
+                    return (
+                      <span
+                        key={label}
+                        data-mode-label={label}
+                        className={`conn-mode-label${active ? ' conn-mode-active' : ''}`}
+                      >
+                        {label}
+                      </span>
+                    );
+                  })}
+                </span>
               )}
             </span>
           )}
