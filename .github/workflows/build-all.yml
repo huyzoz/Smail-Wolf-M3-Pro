@@ -1,34 +1,21 @@
-name: Build All Platforms
+name: Build macOS (arm64 + x64)
 
 on:
   push:
-    branches: [main]
-    tags: ['v*']
+    branches: ['build/macos-*']
   workflow_dispatch:
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
-  build:
-    name: Build (${{ matrix.name }})
-    runs-on: ${{ matrix.os }}
+  build-macos:
+    name: Build macOS Dual-Arch (${{ matrix.runner }})
+    runs-on: ${{ matrix.runner }}
     strategy:
       fail-fast: false
       matrix:
-        include:
-          - platform: windows
-            name: Windows x64
-            os: windows-latest
-            artifact-name: smailwolf-m3pro-windows
-          - platform: linux
-            name: Linux amd64
-            os: ubuntu-22.04
-            artifact-name: smailwolf-m3pro-linux
-          - platform: macos
-            name: macOS
-            os: macos-latest
-            artifact-name: smailwolf-m3pro-macos
+        runner: [macos-15-intel, macos-14]
 
     steps:
       - name: Checkout repository
@@ -41,22 +28,6 @@ jobs:
           cache: npm
           cache-dependency-path: package-lock.json
 
-      - name: Install Linux system dependencies
-        if: matrix.platform == 'linux'
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y \
-            libwebkit2gtk-4.1-dev \
-            build-essential \
-            curl \
-            wget \
-            file \
-            libxdo-dev \
-            libssl-dev \
-            libayatana-appindicator3-dev \
-            librsvg2-dev \
-            libfuse2
-
       - name: Install frontend dependencies
         run: npm ci
 
@@ -66,30 +37,12 @@ jobs:
       - name: HID protocol test gate
         run: npx tsx tests/hid.test.ts
 
-      - name: Setup Rust stable
+      - name: Setup Rust stable (arm64 + x64 Darwin targets)
         uses: dtolnay/rust-toolchain@stable
-
-      - name: Tauri CLI sanity check
-        run: npx tauri --version
-
-      - name: Cargo check (Rust gate)
-        run: cargo check --manifest-path src-tauri/Cargo.toml
-
-      # -----------------------------------------------------------------------
-      # Build Steps
-      # -----------------------------------------------------------------------
-      - name: Build Tauri for Windows (NSIS installer)
-        if: matrix.platform == 'windows'
-        run: npx tauri build --bundles nsis
-
-      - name: Build Tauri for Linux (.deb & .AppImage)
-        if: matrix.platform == 'linux'
-        env:
-          APPIMAGE_EXTRACT_AND_RUN: 1
-        run: npx tauri build --bundles appimage,deb
+        with:
+          targets: aarch64-apple-darwin,x86_64-apple-darwin
 
       - name: Generate native Apple ICNS icon
-        if: matrix.platform == 'macos'
         run: |
           mkdir -p AppIcon.iconset
           sips -z 16 16     src-tauri/icons/icon.png --out AppIcon.iconset/icon_16x16.png
@@ -104,162 +57,40 @@ jobs:
           sips -z 1024 1024 src-tauri/icons/icon.png --out AppIcon.iconset/icon_512x512@2x.png
           iconutil -c icns AppIcon.iconset -o src-tauri/icons/icon.icns
           rm -rf AppIcon.iconset
-          ls -lh src-tauri/icons/icon.icns
 
-      - name: Build Tauri for macOS (.dmg & .app)
-        if: matrix.platform == 'macos'
-        run: npx tauri build --bundles dmg,app
+      - name: Build Tauri for macOS arm64 (Apple Silicon)
+        run: npx tauri build --target aarch64-apple-darwin --bundles dmg,app
 
-      # -----------------------------------------------------------------------
-      # Packaging & SHA-256 Checksums
-      # -----------------------------------------------------------------------
-      - name: Collect Windows artifacts & compute SHA-256
-        if: matrix.platform == 'windows'
-        shell: pwsh
-        run: |
-          $ErrorActionPreference = 'Stop'
-          $version = (Get-Content src-tauri/tauri.conf.json -Raw | ConvertFrom-Json).version
-          if (-not $version) { throw 'Could not read version from src-tauri/tauri.conf.json' }
+      - name: Build Tauri for macOS x64 (Intel)
+        run: npx tauri build --target x86_64-apple-darwin --bundles dmg,app
 
-          New-Item -ItemType Directory -Force release-artifacts | Out-Null
-
-          # NSIS installer (.setup.exe)
-          $setup = Get-ChildItem src-tauri/target/release/bundle/nsis/*-setup.exe -ErrorAction SilentlyContinue | Select-Object -First 1
-          if (-not $setup) { throw 'NSIS installer not found under src-tauri/target/release/bundle/nsis/' }
-          $setupName = "SMAILWOLF-M3-Pro-Driver_${version}_x64-setup.exe"
-          Copy-Item $setup.FullName "release-artifacts/$setupName"
-
-          # Portable .zip
-          $exe = Get-ChildItem src-tauri/target/release/*.exe -Exclude "*-setup.exe" -ErrorAction SilentlyContinue | Select-Object -First 1
-          if (-not $exe) { throw 'App exe not found under src-tauri/target/release/' }
-          $zipName = "SMAILWOLF-M3-Pro-Driver_${version}_x64.zip"
-          Compress-Archive -Path $exe.FullName -DestinationPath "release-artifacts/$zipName" -Force
-
-          # SHA256SUMS.txt
-          $lines = Get-ChildItem release-artifacts/* -File | Where-Object { $_.Name -ne 'SHA256SUMS.txt' } | ForEach-Object {
-            $hash = (Get-FileHash $_.FullName -Algorithm SHA256).Hash.ToLower()
-            "$hash  $($_.Name)"
-          }
-          $lines | Out-File -Encoding ascii release-artifacts/SHA256SUMS.txt
-          Get-Content release-artifacts/SHA256SUMS.txt
-
-      - name: Collect Linux artifacts & compute SHA-256
-        if: matrix.platform == 'linux'
+      - name: Collect macOS arm64 & x64 artifacts
         run: |
           set -e
           mkdir -p release-artifacts
           VERSION=$(node -p "require('./src-tauri/tauri.conf.json').version")
-          if [ -z "$VERSION" ]; then
-            echo "Error: Could not read version from src-tauri/tauri.conf.json"
-            exit 1
-          fi
 
-          # AppImage (portable)
-          APPIMAGE=$(find src-tauri/target/release/bundle/appimage -type f -name "*.[aA]pp[iI]mage" | head -n 1)
-          if [ -z "$APPIMAGE" ]; then
-            echo "Error: AppImage not found"
-            exit 1
-          fi
-          cp "$APPIMAGE" "release-artifacts/SMAILWOLF-M3-Pro-Driver_${VERSION}_amd64.AppImage"
+          for PAIR in "aarch64-apple-darwin:arm64" "x86_64-apple-darwin:x64"; do
+            TARGET="${PAIR%%:*}"
+            ARCH="${PAIR##*:}"
+            TDIR="src-tauri/target/${TARGET}/release"
 
-          # Debian package (.deb)
-          DEB=$(find src-tauri/target/release/bundle/deb -type f -name "*.deb" | head -n 1)
-          if [ -z "$DEB" ]; then
-            echo "Error: Deb package not found"
-            exit 1
-          fi
-          cp "$DEB" "release-artifacts/SMAILWOLF-M3-Pro-Driver_${VERSION}_amd64.deb"
+            DMG=$(find "$TDIR/bundle/dmg" -type f -name "*.dmg" | head -n 1)
+            if [ -z "$DMG" ]; then echo "Missing DMG for $ARCH"; exit 1; fi
+            cp "$DMG" "release-artifacts/SMAILWOLF-M3-Pro-Driver_${VERSION}-macos-${ARCH}.dmg"
 
-          # SHA256SUMS.txt
-          cd release-artifacts
-          sha256sum * | grep -v "SHA256SUMS.txt" > SHA256SUMS.txt
-          echo "=== Linux SHA-256 ==="
-          cat SHA256SUMS.txt
-          cd ..
-
-      - name: Collect macOS artifacts & compute SHA-256
-        if: matrix.platform == 'macos'
-        run: |
-          set -e
-          mkdir -p release-artifacts
-          VERSION=$(node -p "require('./src-tauri/tauri.conf.json').version")
-          if [ -z "$VERSION" ]; then
-            echo "Error: Could not read version from src-tauri/tauri.conf.json"
-            exit 1
-          fi
-
-          # DMG installer
-          DMG=$(find src-tauri/target/release/bundle/dmg -type f -name "*.dmg" | head -n 1)
-          if [ -z "$DMG" ]; then
-            echo "Error: DMG not found"
-            exit 1
-          fi
-          cp "$DMG" "release-artifacts/SMAILWOLF-M3-Pro-Driver_${VERSION}.dmg"
-
-          # Portable zipped .app bundle
-          APP=$(find src-tauri/target/release/bundle/macos -name "*.app" -maxdepth 1 | head -n 1)
-          if [ -z "$APP" ]; then
-            APP=$(find src-tauri/target/release/bundle -name "*.app" -maxdepth 2 | head -n 1)
-          fi
-          if [ -z "$APP" ]; then
-            echo "Error: .app bundle not found"
-            exit 1
-          fi
-
-          if command -v ditto >/dev/null 2>&1; then
-            ditto -c -k --sequesterRsrc --keepParent "$APP" "release-artifacts/SMAILWOLF-M3-Pro-Driver_${VERSION}_macOS.app.zip"
-          else
+            APP=$(find "$TDIR/bundle/macos" -name "*.app" -maxdepth 1 | head -n 1)
+            if [ -z "$APP" ]; then echo "Missing .app for $ARCH"; exit 1; fi
+            ditto -c -k --sequesterRsrc --keepParent "$APP" "release-artifacts/SMAILWOLF-M3-Pro-Driver_${VERSION}-macos-${ARCH}.app.zip"
             APP_DIR=$(dirname "$APP")
             APP_NAME=$(basename "$APP")
-            (cd "$APP_DIR" && zip -r -y "$GITHUB_WORKSPACE/release-artifacts/SMAILWOLF-M3-Pro-Driver_${VERSION}_macOS.app.zip" "$APP_NAME")
-          fi
+            tar -czf "release-artifacts/SMAILWOLF-M3-Pro-Driver_${VERSION}-macos-${ARCH}.app.tar.gz" -C "$APP_DIR" "$APP_NAME"
+          done
+          ls -lh release-artifacts/
 
-          # SHA256SUMS.txt
-          cd release-artifacts
-          shasum -a 256 * | grep -v "SHA256SUMS.txt" > SHA256SUMS.txt
-          echo "=== macOS SHA-256 ==="
-          cat SHA256SUMS.txt
-          cd ..
-
-      - name: Upload platform artifacts
+      - name: Upload macOS dual-arch artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: ${{ matrix.artifact-name }}
+          name: smailwolf-m3pro-macos-all-${{ matrix.runner }}
           path: release-artifacts/
           if-no-files-found: error
-
-  bundle-all:
-    name: Combine All Platforms & Generate Master Checksums
-    needs: [build]
-    runs-on: ubuntu-latest
-    steps:
-      - name: Download all platform artifacts
-        uses: actions/download-artifact@v4
-        with:
-          path: all-artifacts
-
-      - name: Organize release bundle & compute global SHA-256
-        run: |
-          mkdir -p release-bundle
-          # Copy all platform binary artifacts into release-bundle, ignoring per-platform SHA256 files
-          find all-artifacts -type f ! -name "SHA256SUMS.txt" -exec cp {} release-bundle/ \;
-          cd release-bundle
-          sha256sum * > SHA256SUMS.txt
-          echo "=========================================="
-          echo "   Master SHA-256 Checksums (All OS)      "
-          echo "=========================================="
-          cat SHA256SUMS.txt
-
-      - name: Upload combined release bundle
-        uses: actions/upload-artifact@v4
-        with:
-          name: smailwolf-m3pro-all-platforms
-          path: release-bundle/
-          if-no-files-found: error
-
-      - name: Publish to GitHub Releases (tags only)
-        if: startsWith(github.ref, 'refs/tags/v')
-        uses: softprops/action-gh-release@v2
-        continue-on-error: true
-        with:
-          files: release-bundle/*
